@@ -11,6 +11,63 @@ Unreleased
 Added
 -----
 
+* Comprehensive end-user documentation (``docs/user/``): install,
+  quickstart, facets-and-search, tagging, saved-views, exports,
+  configuration, troubleshooting, FAQ.
+* Comprehensive developer documentation (``docs/developer/``):
+  architecture, extending recipes, testing, release process.
+* Consolidated security doc (``docs/security.rst``).
+* ``COURSE_INVENTORY_OWNER_ROLES`` setting so deployments with
+  non-standard role names (e.g. ``limited_staff``) can widen the
+  owner facet.
+* ``COURSE_INVENTORY_MAX_FILTERS_JSON_BYTES`` setting (defaults to
+  4 KB) to override the saved-view body cap.
+* ``make extract_translations`` / ``make compile_translations`` /
+  ``make version-check`` targets.
+
+Changed
+-------
+
+* ``sanitize_filters`` now validates enum-typed keys (``sort``,
+  ``dir``, ``has_owner``, ``last_modified``, ``pacing``,
+  ``enrollment``) against their known value sets. Empty strings
+  inside list values are silently dropped rather than persisted as
+  no-op filters.
+* ``_sanitize_csv_cell`` checks the lstripped form so leading
+  whitespace can't bypass the formula-injection defense.
+* CSV export also defangs ``catalog_visibility`` (consistency with
+  ``display_name`` / ``org``).
+* Enrollment bucket ``"11-100"`` renamed to ``"11-99"`` so the
+  ``"100+"`` bucket (now ``(100, None)``) inclusively contains
+  exactly 100. Old saved views referencing ``"11-100"`` will
+  silently produce no matches; reapply the facet.
+* Tutor plugin ``__version__`` now imports from
+  ``course_inventory.__version__`` so the two cannot drift.
+* Mutation INFO logs now include ``ip=`` and ``req=`` (from
+  ``X-Request-ID``) for audit aggregation.
+* Export links use ``qs_replace format='csv'`` so the URL stays
+  well-formed when the current request already has a ``format=``
+  param.
+
+Removed
+-------
+
+* Unused ``old_modified`` and ``recent_modified`` fixtures from
+  ``tests/conftest.py``.
+* Deprecated ``default_app_config`` from
+  ``course_inventory/__init__.py`` (Django auto-discovers
+  ``apps.CourseInventoryConfig``).
+
+Fixed
+-----
+
+* CI ``audit`` job now uses ``pip-audit --skip-editable`` without
+  ``--strict``; ``--strict`` rejects locally-installed packages that
+  aren't on PyPI, which made the job always-red.
+
+0.1.0 — initial scaffold
+========================
+
 * Hard cap on streaming export (``COURSE_INVENTORY_EXPORT_MAX_ROWS``)
   with a graceful truncation trailer row.
 * ``CourseTag.created_by`` for audit attribution on tag mutations.
@@ -74,8 +131,8 @@ Security
 * All mutating actions on ``CourseTag`` and ``SavedView`` are logged
   at ``INFO`` with the acting username.
 
-0.1.0 — initial scaffold
-========================
+Foundations (pre-release scaffolding)
+=====================================
 
 * Inventory list, faceted filtering, search, sortable columns.
 * Inline tag editing via HTMX partial swaps.

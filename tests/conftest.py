@@ -7,8 +7,6 @@ and the repo root to sys.path, so `import course_inventory`,
 resolve naturally. This file only holds shared fixtures.
 """
 
-from datetime import UTC, datetime, timedelta
-
 import pytest
 from django.contrib.auth import get_user_model
 from opaque_keys.edx.keys import CourseKey
@@ -81,13 +79,3 @@ def add_role(db):
         return CourseAccessRole.objects.create(course_id=course.id, user=user, role=role)
 
     return _add
-
-
-@pytest.fixture
-def old_modified():
-    return datetime(2020, 1, 1, tzinfo=UTC)
-
-
-@pytest.fixture
-def recent_modified():
-    return datetime.now(tz=UTC) - timedelta(days=1)

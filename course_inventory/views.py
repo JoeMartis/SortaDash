@@ -27,10 +27,10 @@ from .models import CourseTag, SavedView
 
 log = logging.getLogger(__name__)
 
-# Hard cap on the JSON body accepted into SavedView.filters_json. Saved
-# views are shared across staff users, so an unbounded blob is a DoS
-# channel — keep this small; real filter dicts are < 1 KB.
-MAX_FILTERS_JSON_BYTES = 4 * 1024
+# Default cap on JSON body accepted into SavedView.filters_json.
+# Real lookups go through the COURSE_INVENTORY_MAX_FILTERS_JSON_BYTES
+# setting; this is the fallback when settings aren't loaded.
+_DEFAULT_MAX_FILTERS_JSON_BYTES = 4 * 1024
 
 # Characters that Excel/Sheets will treat as the start of a formula
 # when a CSV cell begins with them. We prefix with a single quote on
@@ -69,8 +69,14 @@ def _visible_saved_views(user) -> QuerySet[SavedView]:
 
 
 def _sanitize_csv_cell(value):
-    """Defang Excel/Sheets formula injection in a CSV cell."""
-    if isinstance(value, str) and value.startswith(_CSV_INJECTION_PREFIXES):
+    """
+    Defang Excel/Sheets formula injection in a CSV cell.
+
+    Sheets and many CSV importers strip leading whitespace before
+    evaluating the first character, so we must check the lstripped
+    form — ``" =SUM(A1)"`` is just as dangerous as ``"=SUM(A1)"``.
+    """
+    if isinstance(value, str) and value.lstrip().startswith(_CSV_INJECTION_PREFIXES):
         return "'" + value
     return value
 
@@ -158,7 +164,7 @@ def export(request: HttpRequest) -> StreamingHttpResponse:
                     c.start.isoformat() if c.start else "",
                     c.end.isoformat() if c.end else "",
                     "self" if c.self_paced else "instructor",
-                    c.catalog_visibility or "",
+                    _sanitize_csv_cell(c.catalog_visibility or ""),
                     c.modified.isoformat() if c.modified else "",
                     c.enrollment_count,
                     c.owner_count,
@@ -193,11 +199,13 @@ def tag_edit(request: HttpRequest, course_key: str) -> HttpResponse:
         )
         if created:
             log.info(
-                "course_inventory tag added: course=%s %s=%s by=%s",
+                "course_inventory tag added: course=%s %s=%s by=%s ip=%s req=%s",
                 key,
                 tag.key,
                 tag.value,
                 request.user.username,
+                request.META.get("REMOTE_ADDR", ""),
+                request.headers.get("X-Request-ID", ""),
             )
     elif action == "remove":
         try:
@@ -207,10 +215,12 @@ def tag_edit(request: HttpRequest, course_key: str) -> HttpResponse:
         deleted, _per_model = CourseTag.objects.filter(pk=tag_id, course_id=key).delete()
         if deleted:
             log.info(
-                "course_inventory tag removed: course=%s pk=%s by=%s",
+                "course_inventory tag removed: course=%s pk=%s by=%s ip=%s req=%s",
                 key,
                 tag_id,
                 request.user.username,
+                request.META.get("REMOTE_ADDR", ""),
+                request.headers.get("X-Request-ID", ""),
             )
     else:
         return HttpResponseBadRequest(_("unknown action"))
@@ -246,7 +256,12 @@ def saved_view_create(request: HttpRequest) -> HttpResponse:
             )
 
         raw = request.POST.get("filters_json") or "{}"
-        if len(raw.encode("utf-8")) > MAX_FILTERS_JSON_BYTES:
+        max_bytes = getattr(
+            settings,
+            "COURSE_INVENTORY_MAX_FILTERS_JSON_BYTES",
+            _DEFAULT_MAX_FILTERS_JSON_BYTES,
+        )
+        if len(raw.encode("utf-8")) > max_bytes:
             return HttpResponseBadRequest(_("filters_json too large"))
         try:
             parsed = json.loads(raw)
@@ -261,10 +276,12 @@ def saved_view_create(request: HttpRequest) -> HttpResponse:
         obj.filters_json = sanitized
         obj.save()
         log.info(
-            "course_inventory saved_view created: name=%s shared=%s by=%s",
+            "course_inventory saved_view created: name=%s shared=%s by=%s ip=%s req=%s",
             obj.name,
             obj.shared,
             request.user.username,
+            request.META.get("REMOTE_ADDR", ""),
+            request.headers.get("X-Request-ID", ""),
         )
         return HttpResponseRedirect(reverse("course_inventory:saved_view_list"))
 
@@ -285,8 +302,10 @@ def saved_view_delete(request: HttpRequest, pk: int) -> HttpResponse:
     view = get_object_or_404(SavedView, pk=pk, owner=request.user)
     view.delete()
     log.info(
-        "course_inventory saved_view deleted: pk=%s by=%s",
+        "course_inventory saved_view deleted: pk=%s by=%s ip=%s req=%s",
         pk,
         request.user.username,
+        request.META.get("REMOTE_ADDR", ""),
+        request.headers.get("X-Request-ID", ""),
     )
     return HttpResponseRedirect(reverse("course_inventory:saved_view_list"))

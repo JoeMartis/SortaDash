@@ -10,8 +10,7 @@ Public surface:
 - :func:`distinct_orgs` / :func:`distinct_tag_values` — facet helpers.
 
 All callers should go through ``base_queryset`` so the annotation
-contract (``enrollment_count``, ``owner_count``, ``has_owner``) stays
-in one place.
+contract (``enrollment_count``, ``owner_count``) stays in one place.
 """
 
 from __future__ import annotations
@@ -28,11 +27,17 @@ from django.db.models.functions import Coalesce
 
 from .models import CourseTag
 
-# Roles in `CourseAccessRole` that count as "owning" a course for the
-# purpose of the inventory's owner / orphan facet. Kept module-level so
-# the test suite and downstream forks can override without monkeying
-# with strings spread across the file.
+# Default roles that count as "owning" a course for the owner facet.
+# Real lookups go through ``_owner_roles()`` which honors the
+# ``COURSE_INVENTORY_OWNER_ROLES`` setting; this constant is the
+# fallback for tests / out-of-band callers.
 OWNER_ROLES: tuple[str, ...] = ("instructor", "staff")
+
+
+def _owner_roles() -> tuple[str, ...]:
+    from django.conf import settings  # local import keeps services importable without Django setup
+
+    return tuple(getattr(settings, "COURSE_INVENTORY_OWNER_ROLES", OWNER_ROLES))
 
 
 def _lazy_imports():
@@ -82,7 +87,7 @@ def base_queryset() -> QuerySet:
     owner_count = (
         CourseAccessRole.objects.filter(
             course_id=OuterRef("id"),
-            role__in=OWNER_ROLES,
+            role__in=_owner_roles(),
         )
         .order_by()
         .values("course_id")
@@ -105,7 +110,7 @@ def owners_for(course_ids: Iterable) -> dict[object, list[str]]:
     rows = (
         CourseAccessRole.objects.filter(
             course_id__in=list(course_ids),
-            role__in=OWNER_ROLES,
+            role__in=_owner_roles(),
         )
         .select_related("user")
         .values_list("course_id", "user__username")

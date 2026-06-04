@@ -47,7 +47,14 @@ def test_page_decorations_does_not_mutate_course_instances(make_course):
 
 
 def test_sanitize_csv_cell_defangs_formula_prefixes():
-    for bad in ("=A1", "+1+1", "-2+3", "@cmd", "\teval", "\rdo"):
+    for bad in ("=A1", "+1+1", "-2+3", "@cmd"):
+        assert _sanitize_csv_cell(bad).startswith("'")
+        assert _sanitize_csv_cell(bad)[1:] == bad
+
+
+def test_sanitize_csv_cell_defangs_leading_whitespace_bypass():
+    """Sheets strips leading whitespace/tab before evaluating formula."""
+    for bad in (" =SUM(A1)", "\t=evil", "\r=evil", "  +1"):
         assert _sanitize_csv_cell(bad).startswith("'")
         assert _sanitize_csv_cell(bad)[1:] == bad
 
@@ -57,3 +64,6 @@ def test_sanitize_csv_cell_passes_through_safe_values():
     assert _sanitize_csv_cell("") == ""
     assert _sanitize_csv_cell(42) == 42
     assert _sanitize_csv_cell(None) is None
+    # Leading whitespace alone is not a threat.
+    assert _sanitize_csv_cell("   hello") == "   hello"
+    assert _sanitize_csv_cell("\teval") == "\teval"
