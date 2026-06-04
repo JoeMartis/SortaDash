@@ -178,24 +178,31 @@ session = SessionStore()
 session['_auth_user_id'] = str(u.id)
 session['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'
 # Django 4.1+ AuthenticationMiddleware.get_user() requires the
-# session-auth-hash for validation; without it, the session is
-# flushed and the request is treated as anonymous. This is what
-# auth.login() / force_login() set under the hood.
+# session-auth-hash for session validation.
 session['_auth_user_hash'] = u.get_session_auth_hash()
 session.save()
-print('SESSION_KEY:', session.session_key)
+
+# Open edX wraps Django's stock session middleware with
+# SafeSessionMiddleware, which expects the sessionid cookie value to
+# carry a HMAC-signed envelope (session_id | user_id | mac) rather
+# than the raw key. A bare session_key in the cookie is rejected
+# before AuthenticationMiddleware runs, so we must serialize via
+# SafeCookieData ourselves.
+from openedx.core.djangoapps.safe_sessions.middleware import SafeCookieData
+safe = SafeCookieData.create(session.session_key, u.id)
+print('SAFE_COOKIE:', safe.serialize())
 " 2>&1)
 
 # Echo so the run log shows what we got.
 printf '%s\n' "${seed_output}"
 
-SESSION_KEY=$(printf '%s' "${seed_output}" \
-              | grep -E '^SESSION_KEY:' \
+SAFE_COOKIE=$(printf '%s' "${seed_output}" \
+              | grep -E '^SAFE_COOKIE:' \
               | awk '{print $2}' \
               | tr -d '\r' \
               || true)
-[[ -n "${SESSION_KEY}" ]] || fail "could not extract SESSION_KEY from seed output"
-log "  - pre-created session: ${SESSION_KEY:0:8}..."
+[[ -n "${SAFE_COOKIE}" ]] || fail "could not extract SAFE_COOKIE from seed output"
+log "  - pre-created session (safe-wrapped: ${SAFE_COOKIE:0:16}...)"
 
 # ---- step 4: hit the dashboard via curl + session cookie -------------------
 
@@ -207,7 +214,7 @@ log "step 5/6 — assertions"
 # --resolve to map it to 127.0.0.1 and stay on plain HTTP. The Host
 # header still drives Caddy's routing to the CMS upstream.
 CURL=(curl -s --resolve "${STUDIO_HOST}:80:127.0.0.1"
-      -b "sessionid=${SESSION_KEY}")
+      -b "sessionid=${SAFE_COOKIE}")
 BASE="http://${STUDIO_HOST}"
 
 # Hit the inventory.
