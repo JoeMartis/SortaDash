@@ -90,6 +90,31 @@ def test_filter_by_tag(make_course):
     assert ids == ["course-v1:edX+A+1"]
 
 
+def test_sanitize_filters_drops_unknown_keys():
+    out = filters.sanitize_filters({"q": "bio", "evil": "x"})
+    assert out == {"q": "bio"}
+
+
+def test_sanitize_filters_accepts_known_lists():
+    out = filters.sanitize_filters({"org": ["edX", "MITx"], "tag": ["lifecycle=active"]})
+    assert out == {"org": ["edX", "MITx"], "tag": ["lifecycle=active"]}
+
+
+def test_sanitize_filters_rejects_non_dict():
+    assert filters.sanitize_filters([1, 2, 3]) is None
+    assert filters.sanitize_filters("nope") is None
+
+
+def test_sanitize_filters_rejects_nested_objects():
+    assert filters.sanitize_filters({"q": {"nested": "x"}}) is None
+    assert filters.sanitize_filters({"org": [{"nested": "x"}]}) is None
+
+
+def test_sanitize_filters_rejects_overlong_values():
+    assert filters.sanitize_filters({"q": "x" * 1000}) is None
+    assert filters.sanitize_filters({"org": ["x" * 1000]}) is None
+
+
 def test_sort_by_modified_desc(make_course):
     older = make_course(
         "course-v1:edX+older+1",

@@ -1,4 +1,5 @@
 {% extends "course_inventory/base.html" %}
+{% load course_inventory %}
 
 {% block ci_content %}
   <h2>Saved views</h2>
@@ -10,7 +11,7 @@
       {% for v in views %}
         <tr>
           <td>
-            <a href="{% url 'course_inventory:inventory' %}?{% for k, val in v.filters_json.items %}{% if val %}{{ k }}={{ val }}&{% endif %}{% endfor %}">{{ v.name }}</a>
+            <a href="{% url 'course_inventory:inventory' %}?{% build_qs v.filters_json %}">{{ v.name }}</a>
           </td>
           <td>{{ v.owner.username }}</td>
           <td>{% if v.shared %}yes{% else %}no{% endif %}</td>
