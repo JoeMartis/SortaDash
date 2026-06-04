@@ -29,8 +29,15 @@ def regular_user(db):
 
 @pytest.fixture
 def make_course(db):
-    """Factory for CourseOverview rows. Returns the saved instance."""
-    now = datetime(2026, 1, 1, tzinfo=UTC)
+    """
+    Factory for CourseOverview rows.
+
+    `modified` has ``auto_now=True`` on the real model (and on our stub
+    as of round 3), so setting it via ``create()`` is a no-op: Django
+    overwrites it on save. To get a course with a non-now ``modified``
+    timestamp we have to ``.update()`` it after the row exists, which
+    matches how production data ages naturally.
+    """
 
     def _make(
         course_id,
@@ -43,16 +50,19 @@ def make_course(db):
         start=None,
         end=None,
     ):
-        return CourseOverview.objects.create(
+        course = CourseOverview.objects.create(
             id=CourseKey.from_string(course_id),
             display_name=display_name,
             org=org,
             self_paced=self_paced,
             catalog_visibility=catalog_visibility,
-            modified=modified or now,
             start=start,
             end=end,
         )
+        if modified is not None:
+            CourseOverview.objects.filter(pk=course.pk).update(modified=modified)
+            course.refresh_from_db(fields=("modified",))
+        return course
 
     return _make
 

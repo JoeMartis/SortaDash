@@ -145,15 +145,16 @@ to seed a new locale.
 Contributing
 ============
 
-Local dev::
+See ``CONTRIBUTING.rst`` for the full workflow. Quick start::
 
-    python -m venv .venv && source .venv/bin/activate
-    pip install -e ".[dev]"
-    pre-commit install
-    pytest
+    make install
+    make check
 
 CI runs ``pytest`` on Python 3.11 / 3.12 across Django 4.2 / 5.2, plus
-``ruff check`` and ``ruff format --check``.
+``ruff check`` and ``ruff format --check``, ``python -m build``, and
+``pip-audit``. Coverage gate at 85%.
+
+Code of Conduct: see ``CODE_OF_CONDUCT.rst``. Changelog: ``CHANGELOG.rst``.
 
 License
 =======

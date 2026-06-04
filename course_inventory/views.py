@@ -4,6 +4,7 @@ import json
 import logging
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.db.models import QuerySet
 from django.http import (
@@ -23,7 +24,6 @@ from opaque_keys.edx.keys import CourseKey
 from . import filters, services
 from .forms import CourseTagForm, SavedViewForm
 from .models import CourseTag, SavedView
-from .permissions import staff_member_required
 
 log = logging.getLogger(__name__)
 
@@ -44,15 +44,23 @@ def _paginate(request: HttpRequest, qs: QuerySet) -> "Paginator":
     return paginator.get_page(request.GET.get("page") or 1)
 
 
-def _decorate_page(page):
-    """Attach owners + tags to each row in a page (two queries total)."""
+def _page_decorations(page) -> dict:
+    """
+    Build per-row owners and tags for the page.
+
+    Returns ``{course_id: {"owners": [usernames], "tags": [CourseTag]}}``
+    for the templates to look up. Two queries total, regardless of page
+    size.
+
+    Importantly we do *not* mutate the ``CourseOverview`` instances
+    themselves — those are cached process-wide in edx-platform, so
+    attaching per-request attributes to them would leak across
+    requests.
+    """
     course_ids = [c.id for c in page.object_list]
     owners = services.owners_for(course_ids)
     tags = services.tags_for(course_ids)
-    for course in page.object_list:
-        course.owner_usernames = owners.get(course.id, [])
-        course.tags = tags.get(course.id, [])
-    return page
+    return {cid: {"owners": owners.get(cid, []), "tags": tags.get(cid, [])} for cid in course_ids}
 
 
 def _visible_saved_views(user) -> QuerySet[SavedView]:
@@ -71,10 +79,12 @@ def _sanitize_csv_cell(value):
 def inventory_list(request: HttpRequest) -> HttpResponse:
     parsed = filters.parse(request.GET)
     qs = filters.apply(services.base_queryset(), parsed)
-    page = _decorate_page(_paginate(request, qs))
+    page = _paginate(request, qs)
+    decorations = _page_decorations(page)
 
     context = {
         "page": page,
+        "decorations": decorations,
         "filters": parsed,
         "orgs": services.distinct_orgs(),
         "tag_values": services.distinct_tag_values(),

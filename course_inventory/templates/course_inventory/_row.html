@@ -1,4 +1,5 @@
-{% load i18n %}
+{% load i18n course_inventory %}
+{% with rowdata=decorations|get_item:course.id %}
 <tr>
   <td class="ci-name">{{ course.display_name|default:_("(untitled)") }}</td>
   <td>{{ course.org }}</td>
@@ -9,13 +10,14 @@
   <td>{{ course.modified|date:"Y-m-d" }}</td>
   <td class="ci-num">{{ course.enrollment_count }}</td>
   <td>
-    {% if course.owner_usernames %}
-      {{ course.owner_usernames|join:", " }}
+    {% if rowdata.owners %}
+      {{ rowdata.owners|join:", " }}
     {% else %}
       <span class="ci-orphan">{% trans "orphan" %}</span>
     {% endif %}
   </td>
   <td>
-    {% include "course_inventory/_tag_cell.html" with course_id=course.id tags=course.tags %}
+    {% include "course_inventory/_tag_cell.html" with course_id=course.id tags=rowdata.tags %}
   </td>
 </tr>
+{% endwith %}

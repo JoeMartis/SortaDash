@@ -34,8 +34,8 @@ jobs:
       - name: Migrations check
         run: python -m django makemigrations --check --dry-run --settings=settings --pythonpath=tests
 
-      - name: Test
-        run: pytest -v
+      - name: Test (with coverage)
+        run: pytest -v --cov --cov-report=term-missing --cov-fail-under=85
 
   lint:
     runs-on: ubuntu-latest
@@ -48,3 +48,42 @@ jobs:
       - run: python -m pip install --upgrade pip ruff
       - run: ruff check .
       - run: ruff format --check .
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip build
+      - name: Build sdist + wheel (main package)
+        run: python -m build
+      - name: Build sdist + wheel (tutor plugin)
+        run: python -m build tutor-plugin
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            dist/*
+            tutor-plugin/dist/*
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install runtime deps
+        # `pip-audit` audits whatever is installed in the current env,
+        # so we install the project's runtime deps first.
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          python -m pip install -e .
+          python -m pip install -e ./tutor-plugin
+      - name: Audit installed dependencies
+        run: pip-audit --strict --skip-editable
