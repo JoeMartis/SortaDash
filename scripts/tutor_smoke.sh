@@ -127,17 +127,26 @@ tutor local launch --non-interactive
 
 log "step 4/6 — seeding staff user and one course"
 
-tutor local run cms python manage.py manage_user "${STAFF_USER}" "${STAFF_USER}@example.com" --staff --superuser <<EOF || true
-${STAFF_PASS}
-${STAFF_PASS}
-EOF
-
-# Seed one CourseOverview row directly to avoid creating real
-# course content through Studio. This bypasses the modulestore and
-# uses the same MySQL row that the plugin reads.
-tutor local run cms python manage.py shell -c "
+# Note the `cms` subcommand after `manage.py` — Open edX's manage.py
+# is a router; bare `python manage.py shell` is rejected with
+# "invalid choice: 'shell' (choose from 'lms', 'cms')".
+# Both seed steps fit cleanly in a single shell invocation.
+tutor local run cms python manage.py cms shell -c "
+from django.contrib.auth import get_user_model
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+
+User = get_user_model()
+u, _ = User.objects.get_or_create(
+    username='${STAFF_USER}',
+    defaults={'email': '${STAFF_USER}@example.com'},
+)
+u.set_password('${STAFF_PASS}')
+u.is_staff = True
+u.is_superuser = True
+u.save()
+print('seeded staff user:', u.username)
+
 key = CourseKey.from_string('${COURSE_KEY}')
 co, _ = CourseOverview.objects.get_or_create(
     id=key,
@@ -148,7 +157,7 @@ co, _ = CourseOverview.objects.get_or_create(
         'self_paced': False,
     },
 )
-print('seeded', co.id)
+print('seeded course:', co.id)
 "
 
 # ---- step 4: hit the dashboard via curl + session cookie -------------------
