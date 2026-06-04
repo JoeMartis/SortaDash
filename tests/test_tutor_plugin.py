@@ -5,9 +5,17 @@ Smoke tests for the Tutor plugin's hook registrations.
 We can't run Tutor itself in-process easily, but we can verify the
 plugin module loads and registers the right filters and that the
 init task command targets the in-container CLI (not the host wrapper).
+
+Skipped automatically when `tutor` isn't installed so that running
+``pytest`` against only the main CMS plugin doesn't error.
 """
 
-from tutor import hooks
+import pytest
+
+pytest.importorskip("tutor")
+pytest.importorskip("tutorcourseinventory")
+
+from tutor import hooks  # noqa: E402
 
 
 def test_tutor_plugin_imports_and_registers():
