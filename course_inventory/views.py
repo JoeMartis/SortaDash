@@ -1,9 +1,13 @@
 import csv
 import json
+import logging
 
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.db.models import QuerySet
 from django.http import (
+    HttpRequest,
+    HttpResponse,
     HttpResponseBadRequest,
     HttpResponseRedirect,
     StreamingHttpResponse,
@@ -19,8 +23,20 @@ from .forms import CourseTagForm, SavedViewForm
 from .models import CourseTag, SavedView
 from .permissions import staff_member_required
 
+log = logging.getLogger(__name__)
 
-def _paginate(request, qs):
+# Hard cap on the JSON body accepted into SavedView.filters_json. Saved
+# views are shared across staff users, so an unbounded blob is a DoS
+# channel — keep this small; real filter dicts are < 1 KB.
+MAX_FILTERS_JSON_BYTES = 4 * 1024
+
+# Characters that Excel/Sheets will treat as the start of a formula
+# when a CSV cell begins with them. We prefix with a single quote on
+# export to defang.
+_CSV_INJECTION_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _paginate(request: HttpRequest, qs: QuerySet) -> "Paginator":
     page_size = getattr(settings, "COURSE_INVENTORY_PAGE_SIZE", 50)
     paginator = Paginator(qs, page_size)
     return paginator.get_page(request.GET.get("page") or 1)
@@ -37,8 +53,20 @@ def _decorate_page(page):
     return page
 
 
+def _visible_saved_views(user) -> QuerySet[SavedView]:
+    """The user's own saved views plus any shared views."""
+    return (SavedView.objects.filter(owner=user) | SavedView.objects.filter(shared=True)).distinct()
+
+
+def _sanitize_csv_cell(value):
+    """Defang Excel/Sheets formula injection in a CSV cell."""
+    if isinstance(value, str) and value.startswith(_CSV_INJECTION_PREFIXES):
+        return "'" + value
+    return value
+
+
 @staff_member_required
-def inventory_list(request):
+def inventory_list(request: HttpRequest) -> HttpResponse:
     parsed = filters.parse(request.GET)
     qs = filters.apply(services.base_queryset(), parsed)
     page = _decorate_page(_paginate(request, qs))
@@ -54,9 +82,10 @@ def inventory_list(request):
             ["lifecycle", "team", "program", "term"],
         ),
         "querystring": request.GET.urlencode(),
-        "saved_views": SavedView.objects.filter(owner=request.user)
-        | (SavedView.objects.filter(shared=True)),
+        "saved_views": _visible_saved_views(request.user),
     }
+    # HTMX requests get just the table partial so facet/search changes
+    # can swap #inventory-table without a full page reload.
     template = (
         "course_inventory/_table.html"
         if request.headers.get("HX-Request")
@@ -66,8 +95,8 @@ def inventory_list(request):
 
 
 @staff_member_required
-def export(request):
-    fmt = request.GET.get("format", "csv")
+def export(request: HttpRequest) -> StreamingHttpResponse:
+    fmt = "tsv" if request.GET.get("format") == "tsv" else "csv"
     delim = "\t" if fmt == "tsv" else ","
     parsed = filters.parse(request.GET)
     qs = filters.apply(services.base_queryset(), parsed)
@@ -87,6 +116,9 @@ def export(request):
 
     chunk_size = getattr(settings, "COURSE_INVENTORY_EXPORT_CHUNK_SIZE", 500)
 
+    # Standard Django streaming-CSV pattern: a pseudo file-like object
+    # whose write() returns the rendered line, which the generator then
+    # yields. See docs/howto/outputting-csv (streaming responses).
     class Echo:
         def write(self, value):
             return value
@@ -99,8 +131,8 @@ def export(request):
             yield writer.writerow(
                 [
                     str(c.id),
-                    c.display_name or "",
-                    c.org or "",
+                    _sanitize_csv_cell(c.display_name or ""),
+                    _sanitize_csv_cell(c.org or ""),
                     c.start.isoformat() if c.start else "",
                     c.end.isoformat() if c.end else "",
                     "self" if c.self_paced else "instructor",
@@ -111,17 +143,14 @@ def export(request):
                 ]
             )
 
-    response = StreamingHttpResponse(
-        rows(),
-        content_type=f"text/{fmt}",
-    )
+    response = StreamingHttpResponse(rows(), content_type=f"text/{fmt}")
     response["Content-Disposition"] = f'attachment; filename="course-inventory.{fmt}"'
     return response
 
 
 @staff_member_required
 @require_POST
-def tag_edit(request, course_key):
+def tag_edit(request: HttpRequest, course_key: str) -> HttpResponse:
     try:
         key = CourseKey.from_string(course_key)
     except InvalidKeyError:
@@ -133,14 +162,33 @@ def tag_edit(request, course_key):
         form = CourseTagForm(request.POST)
         if not form.is_valid():
             return HttpResponseBadRequest("invalid tag")
-        CourseTag.objects.get_or_create(
+        tag, created = CourseTag.objects.get_or_create(
             course_id=key,
             key=form.cleaned_data["key"],
             value=form.cleaned_data["value"],
+            defaults={"created_by": request.user},
         )
+        if created:
+            log.info(
+                "course_inventory tag added: course=%s %s=%s by=%s",
+                key,
+                tag.key,
+                tag.value,
+                request.user.username,
+            )
     elif action == "remove":
-        tag_id = request.POST.get("tag_id")
-        CourseTag.objects.filter(pk=tag_id, course_id=key).delete()
+        try:
+            tag_id = int(request.POST.get("tag_id", ""))
+        except (TypeError, ValueError):
+            return HttpResponseBadRequest("invalid tag_id")
+        deleted, _ = CourseTag.objects.filter(pk=tag_id, course_id=key).delete()
+        if deleted:
+            log.info(
+                "course_inventory tag removed: course=%s pk=%s by=%s",
+                key,
+                tag_id,
+                request.user.username,
+            )
     else:
         return HttpResponseBadRequest("unknown action")
 
@@ -154,38 +202,54 @@ def tag_edit(request, course_key):
 
 
 @staff_member_required
-def saved_view_list(request):
-    views_qs = SavedView.objects.filter(owner=request.user) | (
-        SavedView.objects.filter(shared=True)
-    )
+def saved_view_list(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "course_inventory/saved_view_list.html",
-        {"views": views_qs.distinct()},
+        {"views": _visible_saved_views(request.user)},
     )
 
 
 @staff_member_required
 @require_http_methods(["GET", "POST"])
-def saved_view_create(request):
+def saved_view_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = SavedViewForm(request.POST)
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.owner = request.user
-            try:
-                obj.filters_json = json.loads(request.POST.get("filters_json") or "{}")
-            except json.JSONDecodeError:
-                obj.filters_json = {}
-            obj.save()
-            return HttpResponseRedirect(reverse("course_inventory:saved_view_list"))
-    else:
-        form = SavedViewForm()
+        if not form.is_valid():
+            return render(
+                request,
+                "course_inventory/saved_view_form.html",
+                {"form": form, "querystring": "", "filters_json": "{}"},
+            )
+
+        raw = request.POST.get("filters_json") or "{}"
+        if len(raw.encode("utf-8")) > MAX_FILTERS_JSON_BYTES:
+            return HttpResponseBadRequest("filters_json too large")
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("filters_json is not valid JSON")
+        sanitized = filters.sanitize_filters(parsed)
+        if sanitized is None:
+            return HttpResponseBadRequest("filters_json failed validation")
+
+        obj = form.save(commit=False)
+        obj.owner = request.user
+        obj.filters_json = sanitized
+        obj.save()
+        log.info(
+            "course_inventory saved_view created: name=%s shared=%s by=%s",
+            obj.name,
+            obj.shared,
+            request.user.username,
+        )
+        return HttpResponseRedirect(reverse("course_inventory:saved_view_list"))
+
     return render(
         request,
         "course_inventory/saved_view_form.html",
         {
-            "form": form,
+            "form": SavedViewForm(),
             "querystring": request.GET.urlencode(),
             "filters_json": json.dumps(filters.parse(request.GET)),
         },
@@ -194,7 +258,12 @@ def saved_view_create(request):
 
 @staff_member_required
 @require_POST
-def saved_view_delete(request, pk):
+def saved_view_delete(request: HttpRequest, pk: int) -> HttpResponse:
     view = get_object_or_404(SavedView, pk=pk, owner=request.user)
     view.delete()
+    log.info(
+        "course_inventory saved_view deleted: pk=%s by=%s",
+        pk,
+        request.user.username,
+    )
     return HttpResponseRedirect(reverse("course_inventory:saved_view_list"))

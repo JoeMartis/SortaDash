@@ -33,6 +33,64 @@ SORTABLE = {
 }
 
 
+# Maximum chars accepted for a single filter value, post-validation.
+# Wide enough for any legitimate org / tag / search string; narrow
+# enough that a stored saved view can't smuggle large payloads through.
+_MAX_VALUE_LEN = 256
+
+# Filter shape used by both `parse()` and `sanitize_filters()`. Keys
+# absent from this map are dropped on validation; this is the schema
+# that lets us safely round-trip saved-view filter blobs.
+_SCHEMA = {
+    "q": "str",
+    "org": "list",
+    "pacing": "list",
+    "visibility": "list",
+    "last_modified": "str",
+    "has_owner": "str",
+    "enrollment": "list",
+    "tag": "list",
+    "sort": "str",
+    "dir": "str",
+}
+
+
+def sanitize_filters(raw):
+    """
+    Validate an untrusted filter dict (e.g. the JSON body posted from
+    a "save view" form) against the known filter schema.
+
+    Returns a normalized dict on success or ``None`` if the input is
+    structurally invalid (not a dict, contains nested objects, has
+    overlong values, etc.). Unknown keys are silently dropped. The
+    return value is safe to store as ``SavedView.filters_json`` and
+    render back through ``build_qs``.
+    """
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for key, want in _SCHEMA.items():
+        if key not in raw:
+            continue
+        value = raw[key]
+        if want == "str":
+            if not isinstance(value, str) or len(value) > _MAX_VALUE_LEN:
+                return None
+            if value:
+                out[key] = value
+        else:  # "list"
+            if not isinstance(value, list):
+                return None
+            cleaned = []
+            for item in value:
+                if not isinstance(item, str) or len(item) > _MAX_VALUE_LEN:
+                    return None
+                cleaned.append(item)
+            if cleaned:
+                out[key] = cleaned
+    return out
+
+
 def parse(get):
     """Convert request.GET into a normalized filter dict."""
     return {
