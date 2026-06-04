@@ -1,0 +1,40 @@
+name: Tutor smoke test
+
+# Manually triggered only. Pulling the full openedx image and booting
+# Tutor takes ~20 minutes, which is too expensive to gate every PR
+# on. Run before releases, when touching the Tutor plugin, or when a
+# CMS-integration concern is raised in review.
+on:
+  workflow_dispatch:
+    inputs:
+      plugin_source:
+        description: "Install from 'local' (this checkout) or 'git' (PyPI)"
+        type: choice
+        options:
+          - local
+          - git
+        default: local
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Tutor
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "tutor>=21,<22"
+
+      - name: Run smoke harness
+        env:
+          PLUGIN_SOURCE: ${{ inputs.plugin_source }}
+        run: bash scripts/tutor_smoke.sh
