@@ -78,8 +78,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install --upgrade pip pip-audit
-      - name: Audit runtime dependencies
-        # `pip-audit` resolves the project's declared deps and queries
-        # the PyPA advisory DB. Fails the job on any unfixed CVE.
-        run: pip-audit --strict --disable-pip
+      - name: Install runtime deps
+        # `pip-audit` audits whatever is installed in the current env,
+        # so we install the project's runtime deps first.
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          python -m pip install -e .
+          python -m pip install -e ./tutor-plugin
+      - name: Audit installed dependencies
+        run: pip-audit --strict --skip-editable
