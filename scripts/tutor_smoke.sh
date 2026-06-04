@@ -130,8 +130,19 @@ log "step 4/6 — seeding staff user and one course"
 # Note the `cms` subcommand after `manage.py` — Open edX's manage.py
 # is a router; bare `python manage.py shell` is rejected with
 # "invalid choice: 'shell' (choose from 'lms', 'cms')".
-# Both seed steps fit cleanly in a single shell invocation.
-tutor local run cms python manage.py cms shell -c "
+#
+# We do three things in one shell:
+#   1. Create a staff superuser.
+#   2. Seed a fake CourseOverview.
+#   3. Pre-create a Django session for that user and print the key.
+# Step 3 lets us skip Open edX's login UI entirely — /admin/login/
+# 302s to /login (LMS), which 302s to an SSO chain, which curl can't
+# usefully follow. With the session key in hand we just set the
+# sessionid cookie directly and the auth middleware accepts the
+# request. Same pattern Django's force_login uses in tests.
+seed_output=$(tutor local run cms python manage.py cms shell -c "
+from importlib import import_module
+from django.conf import settings as dj_settings
 from django.contrib.auth import get_user_model
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
@@ -155,23 +166,35 @@ co, _ = CourseOverview.objects.get_or_create(
         'org': 'edX',
         'catalog_visibility': 'both',
         'self_paced': False,
-        # CourseOverview.VERSION is the cache schema version edx-platform
-        # uses internally. The column is NOT NULL with no default, so a
-        # bare insert from defaults rejects with IntegrityError. Our
-        # stubs don't have this field, which is one of the gaps a real
-        # CMS smoke test surfaces.
+        # CourseOverview.VERSION is the cache schema version
+        # edx-platform uses internally. NOT NULL with no default.
         'version': CourseOverview.VERSION,
     },
 )
 print('seeded course:', co.id)
-"
+
+SessionStore = import_module(dj_settings.SESSION_ENGINE).SessionStore
+session = SessionStore()
+session['_auth_user_id'] = str(u.id)
+session['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'
+session.save()
+print('SESSION_KEY:', session.session_key)
+" 2>&1)
+
+# Echo so the run log shows what we got.
+printf '%s\n' "${seed_output}"
+
+SESSION_KEY=$(printf '%s' "${seed_output}" \
+              | grep -E '^SESSION_KEY:' \
+              | awk '{print $2}' \
+              | tr -d '\r' \
+              || true)
+[[ -n "${SESSION_KEY}" ]] || fail "could not extract SESSION_KEY from seed output"
+log "  - pre-created session: ${SESSION_KEY:0:8}..."
 
 # ---- step 4: hit the dashboard via curl + session cookie -------------------
 
 log "step 5/6 — assertions"
-
-COOKIE_JAR="$(mktemp)"
-trap 'rm -f "${COOKIE_JAR}"' RETURN
 
 # Tutor's `local launch` brings up Caddy on the host's :80 (HTTP only —
 # HTTPS needs an ACME-able domain), and does NOT edit /etc/hosts. From
@@ -179,47 +202,19 @@ trap 'rm -f "${COOKIE_JAR}"' RETURN
 # --resolve to map it to 127.0.0.1 and stay on plain HTTP. The Host
 # header still drives Caddy's routing to the CMS upstream.
 CURL=(curl -s --resolve "${STUDIO_HOST}:80:127.0.0.1"
-      -c "${COOKIE_JAR}" -b "${COOKIE_JAR}")
+      -b "sessionid=${SESSION_KEY}")
 BASE="http://${STUDIO_HOST}"
 
-# Acquire CSRF + session cookies via the admin login flow.
-log "  - logging in as ${STAFF_USER}"
-
-# Each curl + pipe step is wrapped to survive `set -euo pipefail`:
-# we WANT to see the failure mode (empty body, redirect, etc.) rather
-# than have the script die before the diagnostic dump runs.
-login_page=$("${CURL[@]}" "${BASE}/admin/login/" || true)
-log "  - /admin/login/ returned $(printf '%s' "${login_page}" | wc -c) bytes"
-csrf=$(printf '%s' "${login_page}" \
-       | grep -o 'csrfmiddlewaretoken[^>]*value="[^"]*"' \
-       | head -1 \
-       | sed -E 's/.*value="([^"]+)".*/\1/' \
-       || true)
-
-if [[ -z "${csrf}" ]]; then
-    err "could not extract CSRF token from /admin/login/"
-    err "first 800 bytes of response:"
-    printf '%s\n' "${login_page:0:800}"
-    err "(end of dump)"
-    err "trying with -v to capture connection details..."
-    "${CURL[@]}" -v "${BASE}/admin/login/" 2>&1 | head -40 || true
-    fail "abort"
-fi
-log "  - CSRF token acquired"
-
-"${CURL[@]}" \
-    -H "Referer: ${BASE}/admin/login/" \
-    -d "csrfmiddlewaretoken=${csrf}&username=${STAFF_USER}&password=${STAFF_PASS}&next=/admin/" \
-    "${BASE}/admin/login/" \
-    >/dev/null
-
 # Hit the inventory.
-log "  - GET /course-inventory/"
-body=$("${CURL[@]}" -w '\n__STATUS__=%{http_code}\n' "${BASE}/course-inventory/")
+log "  - GET /course-inventory/ as ${STAFF_USER}"
+body=$("${CURL[@]}" -w '\n__STATUS__=%{http_code}\n' "${BASE}/course-inventory/" || true)
 status=$(printf '%s' "${body}" | sed -n 's/^__STATUS__=//p')
 if [[ "${status}" != "200" ]]; then
-    err "expected 200, got ${status} on /course-inventory/"
-    printf '%s\n' "${body:0:600}"
+    err "expected 200, got '${status}' on /course-inventory/"
+    err "first 800 bytes of response:"
+    printf '%s\n' "${body:0:800}"
+    err "(end of dump)"
+    "${CURL[@]}" -v "${BASE}/course-inventory/" 2>&1 | head -40 || true
     fail "abort"
 fi
 echo "${body}" | grep -q "${COURSE_NAME}" \
@@ -233,7 +228,7 @@ log "  - dashboard HTML looks right"
 
 # Hit the export.
 log "  - GET /course-inventory/export?format=csv"
-csv=$("${CURL[@]}" "${BASE}/course-inventory/export?format=csv")
+csv=$("${CURL[@]}" "${BASE}/course-inventory/export?format=csv" || true)
 echo "${csv}" | head -1 | grep -q "course_id,display_name" \
     || fail "CSV header row malformed"
 echo "${csv}" | grep -q "${COURSE_KEY}" \
