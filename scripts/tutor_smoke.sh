@@ -173,36 +173,58 @@ log "step 5/6 — assertions"
 COOKIE_JAR="$(mktemp)"
 trap 'rm -f "${COOKIE_JAR}"' RETURN
 
+# Tutor's `local launch` brings up Caddy on the host's :80 (HTTP only —
+# HTTPS needs an ACME-able domain), and does NOT edit /etc/hosts. From
+# inside the runner, `studio.local.openedx.io` won't resolve. Use
+# --resolve to map it to 127.0.0.1 and stay on plain HTTP. The Host
+# header still drives Caddy's routing to the CMS upstream.
+CURL=(curl -s --resolve "${STUDIO_HOST}:80:127.0.0.1"
+      -c "${COOKIE_JAR}" -b "${COOKIE_JAR}")
+BASE="http://${STUDIO_HOST}"
+
 # Acquire CSRF + session cookies via the admin login flow.
 log "  - logging in as ${STAFF_USER}"
 
-csrf=$(curl -sk -c "${COOKIE_JAR}" -b "${COOKIE_JAR}" \
-    "https://${STUDIO_HOST}/admin/login/" \
-    | grep csrfmiddlewaretoken | head -1 \
-    | sed -E 's/.*value="([^"]+)".*/\1/')
+login_page=$("${CURL[@]}" "${BASE}/admin/login/" || true)
+csrf=$(printf '%s' "${login_page}" \
+       | grep csrfmiddlewaretoken | head -1 \
+       | sed -E 's/.*value="([^"]+)".*/\1/')
 
-[[ -n "${csrf}" ]] || fail "could not extract CSRF token from /admin/login/"
+if [[ -z "${csrf}" ]]; then
+    err "could not extract CSRF token from /admin/login/"
+    err "first 400 bytes of /admin/login/ response:"
+    printf '%s\n' "${login_page:0:400}"
+    fail "abort"
+fi
+log "  - CSRF token acquired"
 
-curl -sk -c "${COOKIE_JAR}" -b "${COOKIE_JAR}" \
-    -H "Referer: https://${STUDIO_HOST}/admin/login/" \
+"${CURL[@]}" \
+    -H "Referer: ${BASE}/admin/login/" \
     -d "csrfmiddlewaretoken=${csrf}&username=${STAFF_USER}&password=${STAFF_PASS}&next=/admin/" \
-    "https://${STUDIO_HOST}/admin/login/" \
+    "${BASE}/admin/login/" \
     >/dev/null
 
 # Hit the inventory.
 log "  - GET /course-inventory/"
-body=$(curl -sk -b "${COOKIE_JAR}" "https://${STUDIO_HOST}/course-inventory/")
+body=$("${CURL[@]}" -w '\n__STATUS__=%{http_code}\n' "${BASE}/course-inventory/")
+status=$(printf '%s' "${body}" | sed -n 's/^__STATUS__=//p')
+if [[ "${status}" != "200" ]]; then
+    err "expected 200, got ${status} on /course-inventory/"
+    printf '%s\n' "${body:0:600}"
+    fail "abort"
+fi
 echo "${body}" | grep -q "${COURSE_NAME}" \
     || fail "expected display_name '${COURSE_NAME}' not in dashboard HTML"
 echo "${body}" | grep -q "django_htmx/htmx.min.js" \
     || fail "expected same-origin HTMX script tag not present"
-echo "${body}" | grep -q "unpkg.com" \
-    && fail "page references unpkg.com CDN (should be same-origin)"
+if echo "${body}" | grep -q "unpkg.com"; then
+    fail "page references unpkg.com CDN (should be same-origin)"
+fi
 log "  - dashboard HTML looks right"
 
 # Hit the export.
 log "  - GET /course-inventory/export?format=csv"
-csv=$(curl -sk -b "${COOKIE_JAR}" "https://${STUDIO_HOST}/course-inventory/export?format=csv")
+csv=$("${CURL[@]}" "${BASE}/course-inventory/export?format=csv")
 echo "${csv}" | head -1 | grep -q "course_id,display_name" \
     || fail "CSV header row malformed"
 echo "${csv}" | grep -q "${COURSE_KEY}" \
