@@ -1,20 +1,25 @@
 {% extends "base.html" %}
-{% load static %}
+{% load i18n static %}
 
-{% block title %}Course Inventory{% endblock %}
+{% block title %}{% trans "Course Inventory" %}{% endblock %}
 
 {% block bodyextra %}{% endblock %}
 
 {% block content %}
   <link rel="stylesheet" href="{% static 'course_inventory/css/inventory.css' %}">
-  <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+  {% comment %}
+    HTMX is shipped by django-htmx (a runtime dep). Loading it via
+    the static tag keeps the asset on the host origin so it works
+    under strict CSP (script-src 'self').
+  {% endcomment %}
+  <script src="{% static 'django_htmx/htmx.min.js' %}" defer></script>
   <script src="{% static 'course_inventory/js/inventory.js' %}" defer></script>
   <main class="course-inventory">
     <header class="ci-header">
-      <h1>Course Inventory</h1>
-      <nav>
-        <a href="{% url 'course_inventory:inventory' %}">Inventory</a>
-        <a href="{% url 'course_inventory:saved_view_list' %}">Saved views</a>
+      <h1>{% trans "Course Inventory" %}</h1>
+      <nav aria-label="{% trans 'Course inventory sections' %}">
+        <a href="{% url 'course_inventory:inventory' %}">{% trans "Inventory" %}</a>
+        <a href="{% url 'course_inventory:saved_view_list' %}">{% trans "Saved views" %}</a>
       </nav>
     </header>
     {% block ci_content %}{% endblock %}

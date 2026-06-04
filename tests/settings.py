@@ -11,6 +11,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.admin",
+    "django_htmx",
     "stubs",
     "course_inventory",
 ]
@@ -54,4 +55,5 @@ STATIC_URL = "/static/"
 # settings hook isn't invoked by Django outside the CMS process).
 COURSE_INVENTORY_PAGE_SIZE = 50
 COURSE_INVENTORY_EXPORT_CHUNK_SIZE = 500
+COURSE_INVENTORY_EXPORT_MAX_ROWS = 10_000
 COURSE_INVENTORY_TAG_KEYS = ["lifecycle", "team", "program", "term"]

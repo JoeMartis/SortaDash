@@ -1,12 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """
 Parse the inventory querystring into a filter dict and apply it to a
 queryset. Kept as pure functions so the export view can reuse the same
 pipeline as the listing view.
 """
 
-from datetime import timedelta
+from __future__ import annotations
 
-from django.db.models import Q
+from datetime import timedelta
+from typing import Any
+
+from django.db.models import Q, QuerySet
+from django.http import QueryDict
 from django.utils import timezone
 
 from .models import CourseTag
@@ -55,7 +60,7 @@ _SCHEMA = {
 }
 
 
-def sanitize_filters(raw):
+def sanitize_filters(raw: Any) -> dict[str, Any] | None:
     """
     Validate an untrusted filter dict (e.g. the JSON body posted from
     a "save view" form) against the known filter schema.
@@ -91,7 +96,7 @@ def sanitize_filters(raw):
     return out
 
 
-def parse(get):
+def parse(get: QueryDict) -> dict[str, Any]:
     """Convert request.GET into a normalized filter dict."""
     return {
         "q": (get.get("q") or "").strip(),
@@ -107,7 +112,7 @@ def parse(get):
     }
 
 
-def apply(qs, filters):
+def apply(qs: QuerySet, filters: dict[str, Any]) -> QuerySet:
     if filters["q"]:
         qs = qs.filter(display_name__icontains=filters["q"])
 

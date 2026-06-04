@@ -1,8 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+import hashlib
 from urllib.parse import urlencode
 
 from django import template
 
 register = template.Library()
+
+
+@register.filter(name="course_dom_id")
+def course_dom_id(course_id):
+    """
+    Stable, collision-resistant DOM id for a course.
+
+    `slugify()` is not safe here: course ids like ``course-v1:edX+A+1``
+    and ``course-v1:edX/A/1`` slugify to the same value, which would
+    cause HTMX swaps to target the wrong row. Hash the canonical
+    string form instead — short enough to stay readable, wide enough
+    that collisions are not a practical concern.
+    """
+    digest = hashlib.sha1(str(course_id).encode("utf-8"), usedforsecurity=False)
+    return digest.hexdigest()[:12]
 
 
 @register.simple_tag(takes_context=True)
