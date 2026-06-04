@@ -4,7 +4,6 @@ import json
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.http import (
-    HttpResponse,
     HttpResponseBadRequest,
     HttpResponseRedirect,
     StreamingHttpResponse,
@@ -55,9 +54,8 @@ def inventory_list(request):
             ["lifecycle", "team", "program", "term"],
         ),
         "querystring": request.GET.urlencode(),
-        "saved_views": SavedView.objects.filter(owner=request.user) | (
-            SavedView.objects.filter(shared=True)
-        ),
+        "saved_views": SavedView.objects.filter(owner=request.user)
+        | (SavedView.objects.filter(shared=True)),
     }
     template = (
         "course_inventory/_table.html"
@@ -98,26 +96,26 @@ def export(request):
     def rows():
         yield writer.writerow(columns)
         for c in qs.iterator(chunk_size=chunk_size):
-            yield writer.writerow([
-                str(c.id),
-                c.display_name or "",
-                c.org or "",
-                c.start.isoformat() if c.start else "",
-                c.end.isoformat() if c.end else "",
-                "self" if c.self_paced else "instructor",
-                c.catalog_visibility or "",
-                c.modified.isoformat() if c.modified else "",
-                c.enrollment_count,
-                c.owner_count,
-            ])
+            yield writer.writerow(
+                [
+                    str(c.id),
+                    c.display_name or "",
+                    c.org or "",
+                    c.start.isoformat() if c.start else "",
+                    c.end.isoformat() if c.end else "",
+                    "self" if c.self_paced else "instructor",
+                    c.catalog_visibility or "",
+                    c.modified.isoformat() if c.modified else "",
+                    c.enrollment_count,
+                    c.owner_count,
+                ]
+            )
 
     response = StreamingHttpResponse(
         rows(),
         content_type=f"text/{fmt}",
     )
-    response["Content-Disposition"] = (
-        f'attachment; filename="course-inventory.{fmt}"'
-    )
+    response["Content-Disposition"] = f'attachment; filename="course-inventory.{fmt}"'
     return response
 
 
@@ -176,15 +174,11 @@ def saved_view_create(request):
             obj = form.save(commit=False)
             obj.owner = request.user
             try:
-                obj.filters_json = json.loads(
-                    request.POST.get("filters_json") or "{}"
-                )
+                obj.filters_json = json.loads(request.POST.get("filters_json") or "{}")
             except json.JSONDecodeError:
                 obj.filters_json = {}
             obj.save()
-            return HttpResponseRedirect(
-                reverse("course_inventory:saved_view_list")
-            )
+            return HttpResponseRedirect(reverse("course_inventory:saved_view_list"))
     else:
         form = SavedViewForm()
     return render(

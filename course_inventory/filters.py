@@ -3,13 +3,13 @@ Parse the inventory querystring into a filter dict and apply it to a
 queryset. Kept as pure functions so the export view can reuse the same
 pipeline as the listing view.
 """
+
 from datetime import timedelta
 
 from django.db.models import Q
 from django.utils import timezone
 
 from .models import CourseTag
-
 
 ENROLLMENT_BUCKETS = {
     "0": (0, 0),
@@ -69,9 +69,7 @@ def apply(qs, filters):
         qs = qs.filter(catalog_visibility__in=filters["visibility"])
 
     if filters["last_modified"] in LAST_MODIFIED_DAYS:
-        cutoff = timezone.now() - timedelta(
-            days=LAST_MODIFIED_DAYS[filters["last_modified"]]
-        )
+        cutoff = timezone.now() - timedelta(days=LAST_MODIFIED_DAYS[filters["last_modified"]])
         qs = qs.filter(modified__gte=cutoff)
     elif filters["last_modified"] == "older":
         cutoff = timezone.now() - timedelta(days=90)
@@ -99,11 +97,7 @@ def apply(qs, filters):
         if "=" not in entry:
             continue
         key, value = entry.split("=", 1)
-        qs = qs.filter(
-            id__in=CourseTag.objects.filter(
-                key=key, value=value
-            ).values("course_id")
-        )
+        qs = qs.filter(id__in=CourseTag.objects.filter(key=key, value=value).values("course_id"))
 
     sort_field = SORTABLE.get(filters["sort"], "display_name")
     if filters["dir"] == "desc":

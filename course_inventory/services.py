@@ -3,6 +3,7 @@ Single source of truth for the course inventory listing query.
 
 Reads from existing edx-platform models only — never the modulestore.
 """
+
 from django.db.models import (
     BooleanField,
     Count,
@@ -113,18 +114,10 @@ def tags_for(course_ids):
 
 def distinct_orgs():
     CourseOverview, _, _ = _lazy_imports()
-    return list(
-        CourseOverview.objects.order_by("org")
-        .values_list("org", flat=True)
-        .distinct()
-    )
+    return list(CourseOverview.objects.order_by("org").values_list("org", flat=True).distinct())
 
 
 def distinct_tag_values():
     """[(key, value, count), ...] for the facet panel."""
-    rows = (
-        CourseTag.objects.values("key", "value")
-        .annotate(c=Count("*"))
-        .order_by("key", "value")
-    )
+    rows = CourseTag.objects.values("key", "value").annotate(c=Count("*")).order_by("key", "value")
     return [(r["key"], r["value"], r["c"]) for r in rows]
