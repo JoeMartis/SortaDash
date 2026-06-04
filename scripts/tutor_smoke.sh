@@ -67,6 +67,7 @@ require_cmd tutor
 require_cmd docker
 require_cmd curl
 require_cmd jq
+require_cmd python3
 
 log "running from ${REPO_ROOT}"
 log "PLUGIN_SOURCE=${PLUGIN_SOURCE}"
@@ -78,12 +79,36 @@ log "step 1/6 — configuring Tutor"
 
 case "${PLUGIN_SOURCE}" in
     local)
-        # Install the Tutor companion plugin in editable mode from the
-        # working tree, then enable it.
+        # Install the Tutor companion plugin from the working tree on
+        # the host (this is what handles the openedx Dockerfile patch).
         pip install -e "${REPO_ROOT}/tutor-plugin"
-        # Override the pip spec to point at the working tree too, so
-        # the openedx image picks up the CMS plugin from source.
-        tutor config save --set "COURSE_INVENTORY_PIP_SPEC=course-inventory @ file://${REPO_ROOT}"
+
+        # Build a wheel from the CMS plugin source. The wheel will be
+        # COPYd into the openedx Docker build context so the build
+        # container can pip-install it. A bare `file://${REPO_ROOT}`
+        # spec does NOT work — the Dockerfile runs inside the build
+        # container where host paths aren't visible.
+        log "  building wheel from ${REPO_ROOT}"
+        rm -rf "${REPO_ROOT}/dist"
+        python3 -m pip install --upgrade build >/dev/null
+        python3 -m build --wheel "${REPO_ROOT}" >/dev/null
+        WHEEL=$(ls "${REPO_ROOT}"/dist/course_inventory-*.whl | head -1)
+        [[ -n "${WHEEL}" ]] || fail "wheel build produced no artifact"
+
+        # Stage the wheel inside Tutor's openedx build context. The
+        # `requirements/` subdir is part of the Docker build context,
+        # so a path like /openedx/requirements/<wheel> resolves inside
+        # the build container.
+        TUTOR_ROOT=$(tutor config printroot)
+        BUILD_REQS="${TUTOR_ROOT}/env/build/openedx/requirements"
+        mkdir -p "${BUILD_REQS}"
+        cp "${WHEEL}" "${BUILD_REQS}/"
+        WHEEL_NAME=$(basename "${WHEEL}")
+        log "  staged $(basename "${WHEEL}") in ${BUILD_REQS}"
+
+        # Point the pip spec at the in-container wheel path.
+        tutor config save --set \
+            "COURSE_INVENTORY_PIP_SPEC=course-inventory @ file:///openedx/requirements/${WHEEL_NAME}"
         ;;
     git)
         pip install tutor-contrib-course-inventory
