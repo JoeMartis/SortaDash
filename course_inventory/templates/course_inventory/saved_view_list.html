@@ -1,0 +1,32 @@
+{% extends "course_inventory/base.html" %}
+
+{% block ci_content %}
+  <h2>Saved views</h2>
+  <table class="ci-table">
+    <thead>
+      <tr><th>Name</th><th>Owner</th><th>Shared</th><th>Updated</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for v in views %}
+        <tr>
+          <td>
+            <a href="{% url 'course_inventory:inventory' %}?{% for k, val in v.filters_json.items %}{% if val %}{{ k }}={{ val }}&{% endif %}{% endfor %}">{{ v.name }}</a>
+          </td>
+          <td>{{ v.owner.username }}</td>
+          <td>{% if v.shared %}yes{% else %}no{% endif %}</td>
+          <td>{{ v.updated_at|date:"Y-m-d H:i" }}</td>
+          <td>
+            {% if v.owner == request.user %}
+              <form method="post" action="{% url 'course_inventory:saved_view_delete' v.pk %}">
+                {% csrf_token %}
+                <button type="submit">Delete</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="ci-empty">No saved views yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

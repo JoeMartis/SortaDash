@@ -1,0 +1,36 @@
+{% extends "course_inventory/base.html" %}
+{% load course_inventory %}
+
+{% block ci_content %}
+  <div class="ci-layout">
+    <aside class="ci-facets">
+      {% include "course_inventory/_facet_panel.html" %}
+    </aside>
+    <section class="ci-main">
+      <form method="get" class="ci-searchbar"
+            hx-get="{% url 'course_inventory:inventory' %}"
+            hx-target="#inventory-table"
+            hx-trigger="submit, keyup changed delay:300ms from:input[name='q']">
+        <input type="search" name="q" value="{{ filters.q }}"
+               placeholder="Search course display name…" />
+        <button type="submit">Search</button>
+        <a class="ci-export"
+           href="{% url 'course_inventory:export' %}?{{ querystring }}&format=csv">
+          Export CSV
+        </a>
+        <a class="ci-export"
+           href="{% url 'course_inventory:export' %}?{{ querystring }}&format=tsv">
+          Export TSV
+        </a>
+        <a class="ci-save"
+           href="{% url 'course_inventory:saved_view_create' %}?{{ querystring }}">
+          Save view
+        </a>
+      </form>
+
+      <div id="inventory-table">
+        {% include "course_inventory/_table.html" %}
+      </div>
+    </section>
+  </div>
+{% endblock %}

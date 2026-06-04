@@ -1,0 +1,13 @@
+{% extends "course_inventory/base.html" %}
+
+{% block ci_content %}
+  <h2>Save current view</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="hidden" name="filters_json" value='{{ filters_json }}' />
+    <p>Filters: <code>?{{ querystring }}</code></p>
+    <button type="submit">Save</button>
+    <a href="{% url 'course_inventory:inventory' %}?{{ querystring }}">Cancel</a>
+  </form>
+{% endblock %}

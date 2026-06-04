@@ -1,0 +1,98 @@
+{% load course_inventory %}
+<datalist id="tag-keys">
+  {% for key in tag_keys %}<option value="{{ key }}">{% endfor %}
+</datalist>
+
+<form class="ci-facet-form"
+      hx-get="{% url 'course_inventory:inventory' %}"
+      hx-target="#inventory-table"
+      hx-trigger="change">
+  <input type="hidden" name="q" value="{{ filters.q }}" />
+
+  <fieldset>
+    <legend>Org</legend>
+    {% for org in orgs %}
+      <label>
+        <input type="checkbox" name="org" value="{{ org }}"
+               {% if org in filters.org %}checked{% endif %} />
+        {{ org }}
+      </label>
+    {% endfor %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Pacing</legend>
+    <label><input type="checkbox" name="pacing" value="self"
+                  {% if 'self' in filters.pacing %}checked{% endif %} /> Self-paced</label>
+    <label><input type="checkbox" name="pacing" value="instructor"
+                  {% if 'instructor' in filters.pacing %}checked{% endif %} /> Instructor-paced</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Visibility</legend>
+    <label><input type="checkbox" name="visibility" value="both"
+                  {% if 'both' in filters.visibility %}checked{% endif %} /> Both</label>
+    <label><input type="checkbox" name="visibility" value="about"
+                  {% if 'about' in filters.visibility %}checked{% endif %} /> About-only</label>
+    <label><input type="checkbox" name="visibility" value="none"
+                  {% if 'none' in filters.visibility %}checked{% endif %} /> None</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Last modified</legend>
+    <label><input type="radio" name="last_modified" value=""
+                  {% if not filters.last_modified %}checked{% endif %} /> Any</label>
+    <label><input type="radio" name="last_modified" value="7d"
+                  {% if filters.last_modified == '7d' %}checked{% endif %} /> Last 7 days</label>
+    <label><input type="radio" name="last_modified" value="30d"
+                  {% if filters.last_modified == '30d' %}checked{% endif %} /> Last 30 days</label>
+    <label><input type="radio" name="last_modified" value="90d"
+                  {% if filters.last_modified == '90d' %}checked{% endif %} /> Last 90 days</label>
+    <label><input type="radio" name="last_modified" value="older"
+                  {% if filters.last_modified == 'older' %}checked{% endif %} /> Older</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Owner</legend>
+    <label><input type="radio" name="has_owner" value=""
+                  {% if not filters.has_owner %}checked{% endif %} /> Any</label>
+    <label><input type="radio" name="has_owner" value="yes"
+                  {% if filters.has_owner == 'yes' %}checked{% endif %} /> Has owner</label>
+    <label><input type="radio" name="has_owner" value="no"
+                  {% if filters.has_owner == 'no' %}checked{% endif %} /> Orphan</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Enrollment</legend>
+    <label><input type="checkbox" name="enrollment" value="0"
+                  {% if '0' in filters.enrollment %}checked{% endif %} /> 0</label>
+    <label><input type="checkbox" name="enrollment" value="1-10"
+                  {% if '1-10' in filters.enrollment %}checked{% endif %} /> 1–10</label>
+    <label><input type="checkbox" name="enrollment" value="11-100"
+                  {% if '11-100' in filters.enrollment %}checked{% endif %} /> 11–100</label>
+    <label><input type="checkbox" name="enrollment" value="100+"
+                  {% if '100+' in filters.enrollment %}checked{% endif %} /> 100+</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Tags</legend>
+    {% for key, value, count in tag_values %}
+      <label>
+        <input type="checkbox" name="tag" value="{{ key }}={{ value }}"
+               {% if key|add:'='|add:value in filters.tag %}checked{% endif %} />
+        {{ key }}={{ value }} ({{ count }})
+      </label>
+    {% empty %}
+      <p class="ci-empty">No tags yet.</p>
+    {% endfor %}
+  </fieldset>
+
+  {% if saved_views %}
+    <fieldset>
+      <legend>Saved views</legend>
+      {% for v in saved_views %}
+        <a href="?{% build_qs v.filters_json.items %}">{{ v.name }}</a>
+      {% endfor %}
+    </fieldset>
+  {% endif %}
+</form>

@@ -1,0 +1,6 @@
+include README.rst
+include LICENSE
+include pyproject.toml
+recursive-include course_inventory/templates *
+recursive-include course_inventory/static *
+recursive-include course_inventory/migrations *.py

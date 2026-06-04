@@ -1,0 +1,35 @@
+{% load course_inventory %}
+<table class="ci-table">
+  <thead>
+    <tr>
+      <th><a href="?{% qs_replace sort='display_name' dir='asc' %}">Display name</a></th>
+      <th><a href="?{% qs_replace sort='org' dir='asc' %}">Org</a></th>
+      <th><a href="?{% qs_replace sort='start' dir='asc' %}">Start</a></th>
+      <th>End</th>
+      <th>Pacing</th>
+      <th>Visibility</th>
+      <th><a href="?{% qs_replace sort='modified' dir='desc' %}">Last modified</a></th>
+      <th><a href="?{% qs_replace sort='enrollment' dir='desc' %}">Enrollment</a></th>
+      <th>Owners</th>
+      <th>Tags</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for course in page.object_list %}
+      {% include "course_inventory/_row.html" with course=course %}
+    {% empty %}
+      <tr><td colspan="10" class="ci-empty">No courses match the current filters.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<nav class="ci-pagination">
+  {% if page.has_previous %}
+    <a href="?{% qs_replace page=page.previous_page_number %}">Previous</a>
+  {% endif %}
+  <span>Page {{ page.number }} of {{ page.paginator.num_pages }}
+        ({{ page.paginator.count }} courses)</span>
+  {% if page.has_next %}
+    <a href="?{% qs_replace page=page.next_page_number %}">Next</a>
+  {% endif %}
+</nav>

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "course-inventory"
+version = "0.1.0"
+description = "Course Inventory & Auditing plugin for Open edX Studio"
+readme = "README.rst"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Open edX Community" }]
+keywords = ["openedx", "edx", "studio", "cms", "plugin", "course-inventory"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "Django>=4.2,<5.3",
+    "edx-opaque-keys>=2.5",
+    "django-htmx>=1.17",
+]
+
+[project.urls]
+Homepage = "https://github.com/openedx/course-inventory"
+Source = "https://github.com/openedx/course-inventory"
+Issues = "https://github.com/openedx/course-inventory/issues"
+
+[project.entry-points."cms.djangoapp"]
+course_inventory = "course_inventory.apps:CourseInventoryConfig"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["course_inventory*"]
+exclude = ["tests*"]

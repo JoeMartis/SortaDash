@@ -1,0 +1,81 @@
+.course-inventory {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 1rem;
+  color: #1f2933;
+}
+
+.ci-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid #d3dce6;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+}
+.ci-header h1 { margin: 0; font-size: 1.5rem; }
+.ci-header nav a { margin-left: 1rem; }
+
+.ci-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1.5rem;
+}
+
+.ci-facets fieldset {
+  border: 1px solid #d3dce6;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+}
+.ci-facets legend { font-weight: 600; font-size: 0.85rem; }
+.ci-facets label { display: block; font-size: 0.85rem; padding: 1px 0; }
+
+.ci-searchbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.ci-searchbar input[type="search"] { flex: 1; padding: 0.4rem; }
+
+.ci-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.ci-table th, .ci-table td {
+  border-bottom: 1px solid #e4e7eb;
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  vertical-align: top;
+}
+.ci-table th { background: #f5f7fa; font-weight: 600; }
+.ci-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ci-empty { color: #7b8794; font-style: italic; padding: 1rem; text-align: center; }
+
+.ci-orphan { color: #c0392b; font-weight: 600; }
+
+.ci-tag-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ci-chip {
+  background: #e0f2fe;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.ci-chip form { display: inline; }
+.ci-chip button {
+  background: none; border: none; cursor: pointer;
+  color: #5e6c84; padding: 0 2px;
+}
+.ci-tag-add { display: inline-flex; gap: 2px; }
+.ci-tag-add input { font-size: 0.75rem; padding: 1px 4px; }
+
+.ci-pagination {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
