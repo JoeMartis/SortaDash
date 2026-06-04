@@ -32,12 +32,22 @@ Native pip install into the CMS venv::
 
     pip install course-inventory
 
-Tutor::
+Tutor (quick: pip-only)::
 
     tutor config save \
       --append OPENEDX_EXTRA_PIP_REQUIREMENTS=course-inventory
     tutor images build openedx
     tutor local launch
+
+Tutor (proper plugin, with auto migrations)::
+
+    pip install tutor-contrib-course-inventory
+    tutor plugins enable course-inventory
+    tutor config save
+    tutor images build openedx
+    tutor local launch
+
+The Tutor plugin source lives in ``tutor-plugin/`` in this repo.
 
 The plugin self-registers via the ``cms.djangoapp`` entry point, so no
 edits to ``edx-platform`` are required.
