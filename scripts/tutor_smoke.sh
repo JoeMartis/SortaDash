@@ -67,7 +67,7 @@ require_cmd tutor
 require_cmd docker
 require_cmd curl
 require_cmd jq
-require_cmd python3
+require_cmd git
 
 log "running from ${REPO_ROOT}"
 log "PLUGIN_SOURCE=${PLUGIN_SOURCE}"
@@ -83,32 +83,23 @@ case "${PLUGIN_SOURCE}" in
         # the host (this is what handles the openedx Dockerfile patch).
         pip install -e "${REPO_ROOT}/tutor-plugin"
 
-        # Build a wheel from the CMS plugin source. The wheel will be
-        # COPYd into the openedx Docker build context so the build
-        # container can pip-install it. A bare `file://${REPO_ROOT}`
-        # spec does NOT work — the Dockerfile runs inside the build
-        # container where host paths aren't visible.
-        log "  building wheel from ${REPO_ROOT}"
-        rm -rf "${REPO_ROOT}/dist"
-        python3 -m pip install --upgrade build >/dev/null
-        python3 -m build --wheel "${REPO_ROOT}" >/dev/null
-        WHEEL=$(ls "${REPO_ROOT}"/dist/course_inventory-*.whl | head -1)
-        [[ -n "${WHEEL}" ]] || fail "wheel build produced no artifact"
-
-        # Stage the wheel inside Tutor's openedx build context. The
-        # `requirements/` subdir is part of the Docker build context,
-        # so a path like /openedx/requirements/<wheel> resolves inside
-        # the build container.
-        TUTOR_ROOT=$(tutor config printroot)
-        BUILD_REQS="${TUTOR_ROOT}/env/build/openedx/requirements"
-        mkdir -p "${BUILD_REQS}"
-        cp "${WHEEL}" "${BUILD_REQS}/"
-        WHEEL_NAME=$(basename "${WHEEL}")
-        log "  staged $(basename "${WHEEL}") in ${BUILD_REQS}"
-
-        # Point the pip spec at the in-container wheel path.
+        # Install the CMS plugin from the working tree's current commit
+        # via git+https. We tried a wheel-staging approach previously,
+        # but Tutor's python-requirements Dockerfile stage doesn't
+        # blanket-COPY ./requirements/, so files dropped there don't
+        # land at /openedx/requirements/ inside the build container.
+        #
+        # git+https sidesteps the build-context problem entirely: pip
+        # clones the public repo at the exact SHA on the host. Requires
+        # the repo to be public (which it is) so no auth is needed.
+        REMOTE_URL=$(git -C "${REPO_ROOT}" config --get remote.origin.url)
+        # Normalize SSH URL to HTTPS form for pip.
+        REMOTE_URL=${REMOTE_URL/git@github.com:/https:\/\/github.com\/}
+        REMOTE_URL=${REMOTE_URL%.git}
+        SHA=$(git -C "${REPO_ROOT}" rev-parse HEAD)
+        log "  installing course-inventory from ${REMOTE_URL}@${SHA}"
         tutor config save --set \
-            "COURSE_INVENTORY_PIP_SPEC=course-inventory @ file:///openedx/requirements/${WHEEL_NAME}"
+            "COURSE_INVENTORY_PIP_SPEC=course-inventory @ git+${REMOTE_URL}@${SHA}"
         ;;
     git)
         pip install tutor-contrib-course-inventory
