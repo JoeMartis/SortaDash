@@ -45,4 +45,22 @@ def get_item(d, key):
 
 @register.simple_tag
 def build_qs(items):
-    return urlencode(items, doseq=True)
+    """
+    Render a filter mapping as a URL querystring.
+
+    Accepts a dict, a dict_items view, or any iterable of (key, value)
+    pairs. Multi-value entries (lists) are expanded into repeated keys.
+    """
+    if hasattr(items, "items"):
+        pairs = list(items.items())
+    else:
+        pairs = list(items)
+    expanded = []
+    for k, v in pairs:
+        if isinstance(v, (list, tuple)):
+            for item in v:
+                if item not in (None, ""):
+                    expanded.append((k, item))
+        elif v not in (None, ""):
+            expanded.append((k, v))
+    return urlencode(expanded, doseq=True)

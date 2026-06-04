@@ -91,7 +91,7 @@
     <fieldset>
       <legend>Saved views</legend>
       {% for v in saved_views %}
-        <a href="?{% build_qs v.filters_json.items %}">{{ v.name }}</a>
+        <a href="?{% build_qs v.filters_json %}">{{ v.name }}</a>
       {% endfor %}
     </fieldset>
   {% endif %}

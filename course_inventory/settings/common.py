@@ -8,9 +8,7 @@ to edx-platform.
 
 
 def plugin_settings(settings):
-    settings.COURSE_INVENTORY_PAGE_SIZE = getattr(
-        settings, "COURSE_INVENTORY_PAGE_SIZE", 50
-    )
+    settings.COURSE_INVENTORY_PAGE_SIZE = getattr(settings, "COURSE_INVENTORY_PAGE_SIZE", 50)
     settings.COURSE_INVENTORY_EXPORT_CHUNK_SIZE = getattr(
         settings, "COURSE_INVENTORY_EXPORT_CHUNK_SIZE", 500
     )
