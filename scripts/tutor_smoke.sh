@@ -155,6 +155,12 @@ co, _ = CourseOverview.objects.get_or_create(
         'org': 'edX',
         'catalog_visibility': 'both',
         'self_paced': False,
+        # CourseOverview.VERSION is the cache schema version edx-platform
+        # uses internally. The column is NOT NULL with no default, so a
+        # bare insert from defaults rejects with IntegrityError. Our
+        # stubs don't have this field, which is one of the gaps a real
+        # CMS smoke test surfaces.
+        'version': CourseOverview.VERSION,
     },
 )
 print('seeded course:', co.id)
