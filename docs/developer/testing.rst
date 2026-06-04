@@ -147,3 +147,52 @@ CI matrix
 
 Tooling drift between ``tox.ini`` and CI is intentionally minimal;
 ``make check`` runs the same commands locally.
+
+Scale tests
+===========
+
+``tests/test_scale.py`` seeds a 1,000-course catalog and asserts the
+plugin's query budget stays constant:
+
+* ``base_queryset()`` resolves to a single SELECT.
+* ``_page_decorations(page)`` is exactly two queries (owners + tags).
+* The end-to-end listing view stays under 8 plugin queries.
+* The same budget holds with every filter applied.
+
+These tests cost ~30 seconds because of the fixture seed. They run
+in the same suite as everything else; if you want to skip them
+locally::
+
+    pytest --deselect tests/test_scale.py
+
+If a future change introduces an N+1 or a per-row query, the
+query-count budget breaks and these tests fail loudly.
+
+Tutor end-to-end smoke
+======================
+
+For real CMS integration coverage that unit tests can't provide,
+``scripts/tutor_smoke.sh`` builds the openedx image with the plugin
+pip-installed, launches a Tutor stack, seeds a staff user and a fake
+``CourseOverview`` row, and asserts that:
+
+* ``GET /course-inventory/`` returns 200 and contains the seeded
+  course's display name.
+* The HTMX bundle is served from the same origin (no ``unpkg.com``).
+* ``GET /course-inventory/export?format=csv`` returns a streaming
+  CSV with the seeded course in it.
+
+It runs in CI behind a manual ``workflow_dispatch`` trigger in
+``.github/workflows/tutor-smoke.yml`` — it's expensive (~20 minutes
+per run) so we don't gate every PR on it. Run before a release,
+when touching ``tutor-plugin/``, or when a reviewer asks for CMS
+integration evidence.
+
+Locally::
+
+    ./scripts/tutor_smoke.sh                  # build, launch, test, teardown
+    KEEP_RUNNING=1 ./scripts/tutor_smoke.sh   # leave the stack up
+    PLUGIN_SOURCE=git ./scripts/tutor_smoke.sh  # install from PyPI, not source
+
+You'll need Tutor 21+, Docker, ~8 GB RAM, ~20 GB disk for the
+openedx image, and a few patient minutes.

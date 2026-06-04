@@ -24,6 +24,15 @@ Added
   4 KB) to override the saved-view body cap.
 * ``make extract_translations`` / ``make compile_translations`` /
   ``make version-check`` targets.
+* ``tests/test_scale.py`` — query-budget tests over a 1,000-course
+  fixture. Asserts ``base_queryset()`` stays one SELECT,
+  ``_page_decorations`` stays two queries, and the end-to-end
+  listing stays under 8 plugin queries regardless of catalog size.
+* ``scripts/tutor_smoke.sh`` + ``.github/workflows/tutor-smoke.yml``
+  — real CMS end-to-end smoke test. Builds the openedx image with
+  the plugin pip-installed, launches Tutor, seeds a course, and
+  asserts the dashboard renders + CSV exports. Manually triggered
+  (workflow_dispatch); too expensive to gate every PR on.
 
 Changed
 -------
