@@ -185,15 +185,24 @@ BASE="http://${STUDIO_HOST}"
 # Acquire CSRF + session cookies via the admin login flow.
 log "  - logging in as ${STAFF_USER}"
 
+# Each curl + pipe step is wrapped to survive `set -euo pipefail`:
+# we WANT to see the failure mode (empty body, redirect, etc.) rather
+# than have the script die before the diagnostic dump runs.
 login_page=$("${CURL[@]}" "${BASE}/admin/login/" || true)
+log "  - /admin/login/ returned $(printf '%s' "${login_page}" | wc -c) bytes"
 csrf=$(printf '%s' "${login_page}" \
-       | grep csrfmiddlewaretoken | head -1 \
-       | sed -E 's/.*value="([^"]+)".*/\1/')
+       | grep -o 'csrfmiddlewaretoken[^>]*value="[^"]*"' \
+       | head -1 \
+       | sed -E 's/.*value="([^"]+)".*/\1/' \
+       || true)
 
 if [[ -z "${csrf}" ]]; then
     err "could not extract CSRF token from /admin/login/"
-    err "first 400 bytes of /admin/login/ response:"
-    printf '%s\n' "${login_page:0:400}"
+    err "first 800 bytes of response:"
+    printf '%s\n' "${login_page:0:800}"
+    err "(end of dump)"
+    err "trying with -v to capture connection details..."
+    "${CURL[@]}" -v "${BASE}/admin/login/" 2>&1 | head -40 || true
     fail "abort"
 fi
 log "  - CSRF token acquired"
