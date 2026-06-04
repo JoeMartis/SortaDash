@@ -19,11 +19,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from django.db.models import (
-    BooleanField,
     Count,
-    ExpressionWrapper,
     OuterRef,
-    Q,
     QuerySet,
     Subquery,
 )
@@ -62,9 +59,8 @@ def base_queryset() -> QuerySet:
     Annotations on every row:
 
     - ``enrollment_count`` — count of active enrollments (int).
-    - ``owner_count`` — count of staff/instructor roles (int).
-    - ``has_owner`` — convenience boolean equivalent to
-      ``owner_count > 0``.
+    - ``owner_count`` — count of staff/instructor roles (int); treat
+      ``owner_count > 0`` as "the course has at least one owner".
 
     Implementation: one SELECT against ``course_overviews_courseoverview``
     plus two correlated subqueries; never joins enrollment or role
@@ -94,18 +90,9 @@ def base_queryset() -> QuerySet:
         .values("c")
     )
 
-    return (
-        CourseOverview.objects.all()
-        .annotate(
-            enrollment_count=Coalesce(Subquery(enrollment_count), 0),
-            owner_count=Coalesce(Subquery(owner_count), 0),
-        )
-        .annotate(
-            has_owner=ExpressionWrapper(
-                Q(owner_count__gt=0),
-                output_field=BooleanField(),
-            ),
-        )
+    return CourseOverview.objects.all().annotate(
+        enrollment_count=Coalesce(Subquery(enrollment_count), 0),
+        owner_count=Coalesce(Subquery(owner_count), 0),
     )
 
 

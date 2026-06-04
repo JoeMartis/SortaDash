@@ -18,7 +18,11 @@ class CourseOverview(models.Model):
     end = models.DateTimeField(null=True, blank=True)
     self_paced = models.BooleanField(default=False)
     catalog_visibility = models.CharField(max_length=64, default="both")
-    modified = models.DateTimeField()
+    # Matches the real `CourseOverview.modified` field (which has
+    # auto_now=True). Tests that need to control the value must use
+    # `CourseOverview.objects.filter(...).update(modified=...)` AFTER
+    # the initial save, mirroring how production data ages naturally.
+    modified = models.DateTimeField(auto_now=True)
 
     class Meta:
         app_label = "stubs"
