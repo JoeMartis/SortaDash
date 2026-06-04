@@ -177,6 +177,11 @@ SessionStore = import_module(dj_settings.SESSION_ENGINE).SessionStore
 session = SessionStore()
 session['_auth_user_id'] = str(u.id)
 session['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'
+# Django 4.1+ AuthenticationMiddleware.get_user() requires the
+# session-auth-hash for validation; without it, the session is
+# flushed and the request is treated as anonymous. This is what
+# auth.login() / force_login() set under the hood.
+session['_auth_user_hash'] = u.get_session_auth_hash()
 session.save()
 print('SESSION_KEY:', session.session_key)
 " 2>&1)
