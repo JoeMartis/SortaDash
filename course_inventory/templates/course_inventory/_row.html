@@ -1,9 +1,10 @@
+{% load i18n %}
 <tr>
-  <td class="ci-name">{{ course.display_name|default:"(untitled)" }}</td>
+  <td class="ci-name">{{ course.display_name|default:_("(untitled)") }}</td>
   <td>{{ course.org }}</td>
   <td>{{ course.start|date:"Y-m-d"|default:"—" }}</td>
   <td>{{ course.end|date:"Y-m-d"|default:"—" }}</td>
-  <td>{% if course.self_paced %}self{% else %}instructor{% endif %}</td>
+  <td>{% if course.self_paced %}{% trans "self" %}{% else %}{% trans "instructor" %}{% endif %}</td>
   <td>{{ course.catalog_visibility|default:"both" }}</td>
   <td>{{ course.modified|date:"Y-m-d" }}</td>
   <td class="ci-num">{{ course.enrollment_count }}</td>
@@ -11,7 +12,7 @@
     {% if course.owner_usernames %}
       {{ course.owner_usernames|join:", " }}
     {% else %}
-      <span class="ci-orphan">orphan</span>
+      <span class="ci-orphan">{% trans "orphan" %}</span>
     {% endif %}
   </td>
   <td>

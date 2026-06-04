@@ -1,30 +1,31 @@
 {% extends "course_inventory/base.html" %}
-{% load course_inventory %}
+{% load i18n course_inventory %}
 
 {% block ci_content %}
   <div class="ci-layout">
-    <aside class="ci-facets">
+    <aside class="ci-facets" aria-label="{% trans 'Filters' %}">
       {% include "course_inventory/_facet_panel.html" %}
     </aside>
-    <section class="ci-main">
-      <form method="get" class="ci-searchbar"
+    <section class="ci-main" aria-label="{% trans 'Course inventory results' %}">
+      <form method="get" class="ci-searchbar" role="search"
             hx-get="{% url 'course_inventory:inventory' %}"
             hx-target="#inventory-table"
             hx-trigger="submit, keyup changed delay:300ms from:input[name='q']">
-        <input type="search" name="q" value="{{ filters.q }}"
-               placeholder="Search course display name…" />
-        <button type="submit">Search</button>
+        <label class="visually-hidden" for="ci-search">{% trans "Search course display name" %}</label>
+        <input id="ci-search" type="search" name="q" value="{{ filters.q }}"
+               placeholder="{% trans 'Search course display name…' %}" />
+        <button type="submit">{% trans "Search" %}</button>
         <a class="ci-export"
            href="{% url 'course_inventory:export' %}?{{ querystring }}&format=csv">
-          Export CSV
+          {% trans "Export CSV" %}
         </a>
         <a class="ci-export"
            href="{% url 'course_inventory:export' %}?{{ querystring }}&format=tsv">
-          Export TSV
+          {% trans "Export TSV" %}
         </a>
         <a class="ci-save"
            href="{% url 'course_inventory:saved_view_create' %}?{{ querystring }}">
-          Save view
+          {% trans "Save view" %}
         </a>
       </form>
 

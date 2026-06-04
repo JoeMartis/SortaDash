@@ -1,31 +1,33 @@
-{% load course_inventory %}
-<div class="ci-tag-cell" id="tags-{{ course_id|slugify }}">
+{% load i18n course_inventory %}
+<div class="ci-tag-cell" id="tags-{{ course_id|course_dom_id }}">
   {% for tag in tags %}
     <span class="ci-chip">
       {{ tag.key }}={{ tag.value }}
       <form method="post"
             action="{% url 'course_inventory:tag_edit' course_id %}"
             hx-post="{% url 'course_inventory:tag_edit' course_id %}"
-            hx-target="#tags-{{ course_id|slugify }}"
+            hx-target="#tags-{{ course_id|course_dom_id }}"
             hx-swap="outerHTML"
             class="ci-inline">
         {% csrf_token %}
         <input type="hidden" name="action" value="remove" />
         <input type="hidden" name="tag_id" value="{{ tag.pk }}" />
-        <button type="submit" title="Remove">x</button>
+        <button type="submit" aria-label="{% blocktrans with k=tag.key v=tag.value %}Remove tag {{ k }}={{ v }}{% endblocktrans %}">x</button>
       </form>
     </span>
   {% endfor %}
   <form method="post"
         action="{% url 'course_inventory:tag_edit' course_id %}"
         hx-post="{% url 'course_inventory:tag_edit' course_id %}"
-        hx-target="#tags-{{ course_id|slugify }}"
+        hx-target="#tags-{{ course_id|course_dom_id }}"
         hx-swap="outerHTML"
         class="ci-tag-add">
     {% csrf_token %}
     <input type="hidden" name="action" value="add" />
-    <input name="key" list="tag-keys" placeholder="key" size="8" required />
-    <input name="value" placeholder="value" size="10" required />
-    <button type="submit">+</button>
+    <label class="visually-hidden" for="ci-tag-key-{{ course_id|course_dom_id }}">{% trans "Tag key" %}</label>
+    <input id="ci-tag-key-{{ course_id|course_dom_id }}" name="key" list="tag-keys" placeholder="{% trans 'key' %}" size="8" required />
+    <label class="visually-hidden" for="ci-tag-value-{{ course_id|course_dom_id }}">{% trans "Tag value" %}</label>
+    <input id="ci-tag-value-{{ course_id|course_dom_id }}" name="value" placeholder="{% trans 'value' %}" size="10" required />
+    <button type="submit" aria-label="{% trans 'Add tag' %}">+</button>
   </form>
 </div>

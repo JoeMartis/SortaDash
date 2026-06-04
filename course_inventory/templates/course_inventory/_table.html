@@ -1,35 +1,34 @@
-{% load course_inventory %}
+{% load i18n course_inventory %}
 <table class="ci-table">
   <thead>
     <tr>
-      <th><a href="?{% qs_replace sort='display_name' dir='asc' page='' %}">Display name</a></th>
-      <th><a href="?{% qs_replace sort='org' dir='asc' page='' %}">Org</a></th>
-      <th><a href="?{% qs_replace sort='start' dir='asc' page='' %}">Start</a></th>
-      <th>End</th>
-      <th>Pacing</th>
-      <th>Visibility</th>
-      <th><a href="?{% qs_replace sort='modified' dir='desc' page='' %}">Last modified</a></th>
-      <th><a href="?{% qs_replace sort='enrollment' dir='desc' page='' %}">Enrollment</a></th>
-      <th>Owners</th>
-      <th>Tags</th>
+      <th aria-sort="{% if filters.sort == 'display_name' %}{{ filters.dir }}ending{% else %}none{% endif %}"><a href="?{% qs_replace sort='display_name' dir='asc' page='' %}">{% trans "Display name" %}</a></th>
+      <th aria-sort="{% if filters.sort == 'org' %}{{ filters.dir }}ending{% else %}none{% endif %}"><a href="?{% qs_replace sort='org' dir='asc' page='' %}">{% trans "Org" %}</a></th>
+      <th aria-sort="{% if filters.sort == 'start' %}{{ filters.dir }}ending{% else %}none{% endif %}"><a href="?{% qs_replace sort='start' dir='asc' page='' %}">{% trans "Start" %}</a></th>
+      <th>{% trans "End" %}</th>
+      <th>{% trans "Pacing" %}</th>
+      <th>{% trans "Visibility" %}</th>
+      <th aria-sort="{% if filters.sort == 'modified' %}{{ filters.dir }}ending{% else %}none{% endif %}"><a href="?{% qs_replace sort='modified' dir='desc' page='' %}">{% trans "Last modified" %}</a></th>
+      <th aria-sort="{% if filters.sort == 'enrollment' %}{{ filters.dir }}ending{% else %}none{% endif %}"><a href="?{% qs_replace sort='enrollment' dir='desc' page='' %}">{% trans "Enrollment" %}</a></th>
+      <th>{% trans "Owners" %}</th>
+      <th>{% trans "Tags" %}</th>
     </tr>
   </thead>
   <tbody>
     {% for course in page.object_list %}
       {% include "course_inventory/_row.html" with course=course %}
     {% empty %}
-      <tr><td colspan="10" class="ci-empty">No courses match the current filters.</td></tr>
+      <tr><td colspan="10" class="ci-empty">{% trans "No courses match the current filters." %}</td></tr>
     {% endfor %}
   </tbody>
 </table>
 
-<nav class="ci-pagination">
+<nav class="ci-pagination" aria-label="{% trans 'Pagination' %}">
   {% if page.has_previous %}
-    <a href="?{% qs_replace page=page.previous_page_number %}">Previous</a>
+    <a href="?{% qs_replace page=page.previous_page_number %}" rel="prev">{% trans "Previous" %}</a>
   {% endif %}
-  <span>Page {{ page.number }} of {{ page.paginator.num_pages }}
-        ({{ page.paginator.count }} courses)</span>
+  <span>{% blocktrans with current=page.number total=page.paginator.num_pages count=page.paginator.count %}Page {{ current }} of {{ total }} ({{ count }} courses){% endblocktrans %}</span>
   {% if page.has_next %}
-    <a href="?{% qs_replace page=page.next_page_number %}">Next</a>
+    <a href="?{% qs_replace page=page.next_page_number %}" rel="next">{% trans "Next" %}</a>
   {% endif %}
 </nav>

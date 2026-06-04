@@ -291,6 +291,31 @@ def test_inventory_list_renders_with_no_courses(client, staff_user):
     assert b"No courses match" in response.content
 
 
+# --- Round 2 regression tests ---
+
+
+def test_export_truncates_at_max_rows(client, staff_user, make_course, settings):
+    """M1: export caps row count and emits a truncation marker."""
+    settings.COURSE_INVENTORY_EXPORT_MAX_ROWS = 2
+    for i in range(5):
+        make_course(f"course-v1:edX+C{i}+1", display_name=f"C{i}")
+    client.force_login(staff_user)
+    response = client.get(reverse("course_inventory:export"))
+    body = b"".join(response.streaming_content).decode()
+    # Two data rows + header + truncation marker (4 lines total).
+    assert body.count("\n") == 4
+    assert "__TRUNCATED__" in body
+
+
+def test_htmx_asset_served_from_origin(client, staff_user, make_course):
+    """M4: page references the local django-htmx asset, not a CDN."""
+    make_course("course-v1:edX+A+1", display_name="A")
+    client.force_login(staff_user)
+    response = client.get(reverse("course_inventory:inventory"))
+    assert b"unpkg.com" not in response.content
+    assert b"django_htmx/htmx.min.js" in response.content
+
+
 def test_inventory_list_handles_garbage_page_param(client, staff_user, make_course):
     """Django's get_page() should coerce bad values to page 1."""
     make_course("course-v1:edX+A+1")

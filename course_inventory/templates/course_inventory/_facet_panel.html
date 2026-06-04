@@ -1,4 +1,4 @@
-{% load course_inventory %}
+{% load i18n course_inventory %}
 <datalist id="tag-keys">
   {% for key in tag_keys %}<option value="{{ key }}">{% endfor %}
 </datalist>
@@ -10,7 +10,7 @@
   <input type="hidden" name="q" value="{{ filters.q }}" />
 
   <fieldset>
-    <legend>Org</legend>
+    <legend>{% trans "Org" %}</legend>
     {% for org in orgs %}
       <label>
         <input type="checkbox" name="org" value="{{ org }}"
@@ -21,49 +21,49 @@
   </fieldset>
 
   <fieldset>
-    <legend>Pacing</legend>
+    <legend>{% trans "Pacing" %}</legend>
     <label><input type="checkbox" name="pacing" value="self"
-                  {% if 'self' in filters.pacing %}checked{% endif %} /> Self-paced</label>
+                  {% if 'self' in filters.pacing %}checked{% endif %} /> {% trans "Self-paced" %}</label>
     <label><input type="checkbox" name="pacing" value="instructor"
-                  {% if 'instructor' in filters.pacing %}checked{% endif %} /> Instructor-paced</label>
+                  {% if 'instructor' in filters.pacing %}checked{% endif %} /> {% trans "Instructor-paced" %}</label>
   </fieldset>
 
   <fieldset>
-    <legend>Visibility</legend>
+    <legend>{% trans "Visibility" %}</legend>
     <label><input type="checkbox" name="visibility" value="both"
-                  {% if 'both' in filters.visibility %}checked{% endif %} /> Both</label>
+                  {% if 'both' in filters.visibility %}checked{% endif %} /> {% trans "Both" %}</label>
     <label><input type="checkbox" name="visibility" value="about"
-                  {% if 'about' in filters.visibility %}checked{% endif %} /> About-only</label>
+                  {% if 'about' in filters.visibility %}checked{% endif %} /> {% trans "About-only" %}</label>
     <label><input type="checkbox" name="visibility" value="none"
-                  {% if 'none' in filters.visibility %}checked{% endif %} /> None</label>
+                  {% if 'none' in filters.visibility %}checked{% endif %} /> {% trans "None" %}</label>
   </fieldset>
 
   <fieldset>
-    <legend>Last modified</legend>
+    <legend>{% trans "Last modified" %}</legend>
     <label><input type="radio" name="last_modified" value=""
-                  {% if not filters.last_modified %}checked{% endif %} /> Any</label>
+                  {% if not filters.last_modified %}checked{% endif %} /> {% trans "Any" %}</label>
     <label><input type="radio" name="last_modified" value="7d"
-                  {% if filters.last_modified == '7d' %}checked{% endif %} /> Last 7 days</label>
+                  {% if filters.last_modified == '7d' %}checked{% endif %} /> {% trans "Last 7 days" %}</label>
     <label><input type="radio" name="last_modified" value="30d"
-                  {% if filters.last_modified == '30d' %}checked{% endif %} /> Last 30 days</label>
+                  {% if filters.last_modified == '30d' %}checked{% endif %} /> {% trans "Last 30 days" %}</label>
     <label><input type="radio" name="last_modified" value="90d"
-                  {% if filters.last_modified == '90d' %}checked{% endif %} /> Last 90 days</label>
+                  {% if filters.last_modified == '90d' %}checked{% endif %} /> {% trans "Last 90 days" %}</label>
     <label><input type="radio" name="last_modified" value="older"
-                  {% if filters.last_modified == 'older' %}checked{% endif %} /> Older</label>
+                  {% if filters.last_modified == 'older' %}checked{% endif %} /> {% trans "Older than 90 days" %}</label>
   </fieldset>
 
   <fieldset>
-    <legend>Owner</legend>
+    <legend>{% trans "Owner" %}</legend>
     <label><input type="radio" name="has_owner" value=""
-                  {% if not filters.has_owner %}checked{% endif %} /> Any</label>
+                  {% if not filters.has_owner %}checked{% endif %} /> {% trans "Any" %}</label>
     <label><input type="radio" name="has_owner" value="yes"
-                  {% if filters.has_owner == 'yes' %}checked{% endif %} /> Has owner</label>
+                  {% if filters.has_owner == 'yes' %}checked{% endif %} /> {% trans "Has owner" %}</label>
     <label><input type="radio" name="has_owner" value="no"
-                  {% if filters.has_owner == 'no' %}checked{% endif %} /> Orphan</label>
+                  {% if filters.has_owner == 'no' %}checked{% endif %} /> {% trans "Orphan" %}</label>
   </fieldset>
 
   <fieldset>
-    <legend>Enrollment</legend>
+    <legend>{% trans "Enrollment" %}</legend>
     <label><input type="checkbox" name="enrollment" value="0"
                   {% if '0' in filters.enrollment %}checked{% endif %} /> 0</label>
     <label><input type="checkbox" name="enrollment" value="1-10"
@@ -75,7 +75,7 @@
   </fieldset>
 
   <fieldset>
-    <legend>Tags</legend>
+    <legend>{% trans "Tags" %}</legend>
     {% for key, value, count in tag_values %}
       <label>
         <input type="checkbox" name="tag" value="{{ key }}={{ value }}"
@@ -83,13 +83,13 @@
         {{ key }}={{ value }} ({{ count }})
       </label>
     {% empty %}
-      <p class="ci-empty">No tags yet.</p>
+      <p class="ci-empty">{% trans "No tags yet." %}</p>
     {% endfor %}
   </fieldset>
 
   {% if saved_views %}
     <fieldset>
-      <legend>Saved views</legend>
+      <legend>{% trans "Saved views" %}</legend>
       {% for v in saved_views %}
         <a href="?{% build_qs v.filters_json %}">{{ v.name }}</a>
       {% endfor %}

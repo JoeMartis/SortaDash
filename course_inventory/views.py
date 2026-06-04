@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 import csv
 import json
 import logging
@@ -14,6 +15,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods, require_POST
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
@@ -115,6 +117,7 @@ def export(request: HttpRequest) -> StreamingHttpResponse:
     ]
 
     chunk_size = getattr(settings, "COURSE_INVENTORY_EXPORT_CHUNK_SIZE", 500)
+    max_rows = getattr(settings, "COURSE_INVENTORY_EXPORT_MAX_ROWS", 10_000)
 
     # Standard Django streaming-CSV pattern: a pseudo file-like object
     # whose write() returns the rendered line, which the generator then
@@ -127,7 +130,16 @@ def export(request: HttpRequest) -> StreamingHttpResponse:
 
     def rows():
         yield writer.writerow(columns)
+        emitted = 0
         for c in qs.iterator(chunk_size=chunk_size):
+            if emitted >= max_rows:
+                # Trailer row makes it explicit to anyone opening the
+                # file that the export was truncated. Keeps the file
+                # well-formed CSV/TSV — no trailing partial rows.
+                yield writer.writerow(
+                    [f"__TRUNCATED__ at {max_rows} rows; narrow your filters and re-export"]
+                )
+                return
             yield writer.writerow(
                 [
                     str(c.id),
@@ -142,6 +154,7 @@ def export(request: HttpRequest) -> StreamingHttpResponse:
                     c.owner_count,
                 ]
             )
+            emitted += 1
 
     response = StreamingHttpResponse(rows(), content_type=f"text/{fmt}")
     response["Content-Disposition"] = f'attachment; filename="course-inventory.{fmt}"'
@@ -154,14 +167,14 @@ def tag_edit(request: HttpRequest, course_key: str) -> HttpResponse:
     try:
         key = CourseKey.from_string(course_key)
     except InvalidKeyError:
-        return HttpResponseBadRequest("invalid course key")
+        return HttpResponseBadRequest(_("invalid course key"))
 
     action = request.POST.get("action", "add")
 
     if action == "add":
         form = CourseTagForm(request.POST)
         if not form.is_valid():
-            return HttpResponseBadRequest("invalid tag")
+            return HttpResponseBadRequest(_("invalid tag"))
         tag, created = CourseTag.objects.get_or_create(
             course_id=key,
             key=form.cleaned_data["key"],
@@ -180,8 +193,8 @@ def tag_edit(request: HttpRequest, course_key: str) -> HttpResponse:
         try:
             tag_id = int(request.POST.get("tag_id", ""))
         except (TypeError, ValueError):
-            return HttpResponseBadRequest("invalid tag_id")
-        deleted, _ = CourseTag.objects.filter(pk=tag_id, course_id=key).delete()
+            return HttpResponseBadRequest(_("invalid tag_id"))
+        deleted, _per_model = CourseTag.objects.filter(pk=tag_id, course_id=key).delete()
         if deleted:
             log.info(
                 "course_inventory tag removed: course=%s pk=%s by=%s",
@@ -190,7 +203,7 @@ def tag_edit(request: HttpRequest, course_key: str) -> HttpResponse:
                 request.user.username,
             )
     else:
-        return HttpResponseBadRequest("unknown action")
+        return HttpResponseBadRequest(_("unknown action"))
 
     # Re-render just this row's tag cell for HTMX swap.
     tags = list(CourseTag.objects.filter(course_id=key))
@@ -224,14 +237,14 @@ def saved_view_create(request: HttpRequest) -> HttpResponse:
 
         raw = request.POST.get("filters_json") or "{}"
         if len(raw.encode("utf-8")) > MAX_FILTERS_JSON_BYTES:
-            return HttpResponseBadRequest("filters_json too large")
+            return HttpResponseBadRequest(_("filters_json too large"))
         try:
             parsed = json.loads(raw)
         except json.JSONDecodeError:
-            return HttpResponseBadRequest("filters_json is not valid JSON")
+            return HttpResponseBadRequest(_("filters_json is not valid JSON"))
         sanitized = filters.sanitize_filters(parsed)
         if sanitized is None:
-            return HttpResponseBadRequest("filters_json failed validation")
+            return HttpResponseBadRequest(_("filters_json failed validation"))
 
         obj = form.save(commit=False)
         obj.owner = request.user
