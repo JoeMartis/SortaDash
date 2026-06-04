@@ -25,6 +25,23 @@ def plugin_settings(settings):
         "COURSE_INVENTORY_TAG_KEYS",
         ["lifecycle", "team", "program", "term"],
     )
+    # Roles in CourseAccessRole that count as "owning" a course for
+    # the owner facet. Override if your install uses non-standard
+    # role names (e.g. ``"limited_staff"``).
+    settings.COURSE_INVENTORY_OWNER_ROLES = getattr(
+        settings,
+        "COURSE_INVENTORY_OWNER_ROLES",
+        ("instructor", "staff"),
+    )
+    # Hard cap on the raw JSON body accepted into
+    # SavedView.filters_json. Saved views can be shared across staff,
+    # so an unbounded blob is a memory amplification channel — keep
+    # this small; real filter dicts are < 1 KB.
+    settings.COURSE_INVENTORY_MAX_FILTERS_JSON_BYTES = getattr(
+        settings,
+        "COURSE_INVENTORY_MAX_FILTERS_JSON_BYTES",
+        4 * 1024,
+    )
 
     # Ensure django_htmx is installed so the bundled htmx.min.js asset
     # is served from the host's own origin (no CDN, CSP-friendly).

@@ -16,11 +16,11 @@
                placeholder="{% trans 'Search course display name…' %}" />
         <button type="submit">{% trans "Search" %}</button>
         <a class="ci-export"
-           href="{% url 'course_inventory:export' %}?{{ querystring }}&format=csv">
+           href="{% url 'course_inventory:export' %}?{% qs_replace format='csv' %}">
           {% trans "Export CSV" %}
         </a>
         <a class="ci-export"
-           href="{% url 'course_inventory:export' %}?{{ querystring }}&format=tsv">
+           href="{% url 'course_inventory:export' %}?{% qs_replace format='tsv' %}">
           {% trans "Export TSV" %}
         </a>
         <a class="ci-save"

@@ -19,8 +19,8 @@ from .models import CourseTag
 ENROLLMENT_BUCKETS = {
     "0": (0, 0),
     "1-10": (1, 10),
-    "11-100": (11, 100),
-    "100+": (101, None),
+    "11-99": (11, 99),
+    "100+": (100, None),
 }
 
 LAST_MODIFIED_DAYS = {
@@ -46,17 +46,21 @@ _MAX_VALUE_LEN = 256
 # Filter shape used by both `parse()` and `sanitize_filters()`. Keys
 # absent from this map are dropped on validation; this is the schema
 # that lets us safely round-trip saved-view filter blobs.
-_SCHEMA = {
+#
+# For ``"str"`` fields we accept any non-empty string up to
+# ``_MAX_VALUE_LEN`` unless an enum is supplied. ``"enum"`` is the
+# tighter form — the value must be one of the listed strings.
+_SCHEMA: dict[str, object] = {
     "q": "str",
     "org": "list",
-    "pacing": "list",
+    "pacing": ("enum_list", {"self", "instructor"}),
     "visibility": "list",
-    "last_modified": "str",
-    "has_owner": "str",
-    "enrollment": "list",
+    "last_modified": ("enum", set(LAST_MODIFIED_DAYS) | {"", "older"}),
+    "has_owner": ("enum", {"", "yes", "no"}),
+    "enrollment": ("enum_list", set(ENROLLMENT_BUCKETS)),
     "tag": "list",
-    "sort": "str",
-    "dir": "str",
+    "sort": ("enum", set(SORTABLE) | {""}),
+    "dir": ("enum", {"", "asc", "desc"}),
 }
 
 
@@ -73,22 +77,35 @@ def sanitize_filters(raw: Any) -> dict[str, Any] | None:
     """
     if not isinstance(raw, dict):
         return None
-    out = {}
+    out: dict[str, Any] = {}
     for key, want in _SCHEMA.items():
         if key not in raw:
             continue
         value = raw[key]
-        if want == "str":
+        kind = want if isinstance(want, str) else want[0]
+        allowed = None if isinstance(want, str) else want[1]
+        if kind == "str":
             if not isinstance(value, str) or len(value) > _MAX_VALUE_LEN:
                 return None
             if value:
                 out[key] = value
-        else:  # "list"
+        elif kind == "enum":
+            if not isinstance(value, str) or value not in allowed:
+                return None
+            if value:
+                out[key] = value
+        elif kind in ("list", "enum_list"):
             if not isinstance(value, list):
                 return None
             cleaned = []
             for item in value:
                 if not isinstance(item, str) or len(item) > _MAX_VALUE_LEN:
+                    return None
+                # Skip empty strings — they're a no-op filter at best
+                # and a smuggling channel at worst.
+                if not item:
+                    continue
+                if kind == "enum_list" and item not in allowed:
                     return None
                 cleaned.append(item)
             if cleaned:

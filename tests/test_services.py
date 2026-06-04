@@ -30,6 +30,15 @@ def test_base_queryset_owner_count_only_counts_owner_roles(make_course, add_role
     assert row.owner_count == 1
 
 
+def test_owner_roles_setting_is_honored(make_course, add_role, staff_user, settings):
+    """COURSE_INVENTORY_OWNER_ROLES override widens what counts as an owner."""
+    settings.COURSE_INVENTORY_OWNER_ROLES = ("instructor", "staff", "limited_staff")
+    course = make_course("course-v1:edX+A+1")
+    add_role(course, staff_user, role="limited_staff")
+    row = services.base_queryset().get(id=course.id)
+    assert row.owner_count == 1
+
+
 def test_owners_for_groups_by_course(make_course, add_role, staff_user, regular_user):
     a = make_course("course-v1:edX+A+1")
     b = make_course("course-v1:edX+B+1")

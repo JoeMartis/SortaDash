@@ -115,6 +115,44 @@ def test_sanitize_filters_rejects_overlong_values():
     assert filters.sanitize_filters({"org": ["x" * 1000]}) is None
 
 
+def test_sanitize_filters_drops_empty_strings_in_lists():
+    """Defense-in-depth: empty entries are a no-op smuggling channel."""
+    out = filters.sanitize_filters({"org": ["edX", "", "MITx"]})
+    assert out == {"org": ["edX", "MITx"]}
+
+
+def test_sanitize_filters_validates_sort_enum():
+    assert filters.sanitize_filters({"sort": "display_name"}) == {"sort": "display_name"}
+    assert filters.sanitize_filters({"sort": "<script>"}) is None
+    assert filters.sanitize_filters({"sort": "rogue_column"}) is None
+
+
+def test_sanitize_filters_validates_dir_enum():
+    assert filters.sanitize_filters({"dir": "asc"}) == {"dir": "asc"}
+    assert filters.sanitize_filters({"dir": "asc; DROP TABLE"}) is None
+
+
+def test_sanitize_filters_validates_has_owner_enum():
+    assert filters.sanitize_filters({"has_owner": "yes"}) == {"has_owner": "yes"}
+    assert filters.sanitize_filters({"has_owner": "maybe"}) is None
+
+
+def test_sanitize_filters_validates_pacing_enum_list():
+    assert filters.sanitize_filters({"pacing": ["self"]}) == {"pacing": ["self"]}
+    assert filters.sanitize_filters({"pacing": ["bogus"]}) is None
+
+
+def test_sanitize_filters_validates_enrollment_enum_list():
+    assert filters.sanitize_filters({"enrollment": ["0", "100+"]}) == {"enrollment": ["0", "100+"]}
+    assert filters.sanitize_filters({"enrollment": ["bogus"]}) is None
+
+
+def test_sanitize_filters_validates_last_modified_enum():
+    assert filters.sanitize_filters({"last_modified": "7d"}) == {"last_modified": "7d"}
+    assert filters.sanitize_filters({"last_modified": "older"}) == {"last_modified": "older"}
+    assert filters.sanitize_filters({"last_modified": "yesterday"}) is None
+
+
 def test_sort_by_modified_desc(make_course):
     older = make_course(
         "course-v1:edX+older+1",
