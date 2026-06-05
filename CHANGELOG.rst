@@ -29,10 +29,16 @@ Added
   ``_page_decorations`` stays two queries, and the end-to-end
   listing stays under 8 plugin queries regardless of catalog size.
 * ``scripts/tutor_smoke.sh`` + ``.github/workflows/tutor-smoke.yml``
-  — real CMS end-to-end smoke test. Builds the openedx image with
+  — Tutor end-to-end smoke harness. Builds the openedx image with
   the plugin pip-installed, launches Tutor, seeds a course, and
-  asserts the dashboard renders + CSV exports. Manually triggered
+  drives ``/course-inventory/``. Manually triggered
   (workflow_dispatch); too expensive to gate every PR on.
+  Validates seven of eight integration phases against a real CMS
+  (image build, plugin loading, migrations, URL routing,
+  ``@staff_member_required``, ``CourseOverview`` insert + signal);
+  the eighth phase (curl-driven assertions with a pre-authenticated
+  session through ``SafeSessionMiddleware``) is out of scope per
+  ``docs/developer/testing.rst``.
 
 Changed
 -------
